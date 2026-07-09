@@ -21,6 +21,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -30,6 +31,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -40,6 +42,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,7 +52,9 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -99,7 +105,6 @@ class MainActivity : ComponentActivity() {
                         override fun onReceive(context: Context, intent: Intent) {
                             val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
                             if (id == downloadId && id != -1L) {
-                                // Trigger the modern UI dialog instead of showing a snackbar/toast
                                 showInstallDialog = true
                             }
                         }
@@ -114,7 +119,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 when (isTermsAccepted) {
-                    null -> { /* Silent loading */ }
+                    null -> { /* Background check */ }
                     false -> {
                         TermsAndConditionsDialog(
                             onAccept = { scope.launch { preferenceManager.setTermsAccepted(true) } },
@@ -206,7 +211,6 @@ class MainActivity : ComponentActivity() {
 
     private fun downloadAndInstallApk(context: Context, url: String): Long {
         try {
-            // Clear previous download if exists
             val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "update.apk")
             if (file.exists()) file.delete()
 
@@ -415,35 +419,35 @@ fun CustomUpdateDialog(onUpdate: () -> Unit, onDismiss: () -> Unit) {
 }
 
 @Composable
-fun ModernLoader(isVisible: Boolean, isTransition: Boolean = false) {
+fun ModernBrandedLoader(isVisible: Boolean, isTransition: Boolean = false) {
     AnimatedVisibility(
         visible = isVisible,
-        enter = fadeIn(animationSpec = tween(150)),
+        enter = fadeIn(animationSpec = tween(100)),
         exit = fadeOut(animationSpec = tween(300))
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(if (isTransition) Color.Transparent else MaterialTheme.colorScheme.background),
+                .background(if (isTransition) Color.Black.copy(alpha = 0.4f) else MaterialTheme.colorScheme.background),
             contentAlignment = if (isTransition) Alignment.TopCenter else Alignment.Center
         ) {
-            val infiniteTransition = rememberInfiniteTransition(label = "modern_loader")
+            val infiniteTransition = rememberInfiniteTransition(label = "branded_loader")
             
             val rotation by infiniteTransition.animateFloat(
                 initialValue = 0f,
                 targetValue = 360f,
                 animationSpec = infiniteRepeatable(
-                    animation = tween(1200, easing = LinearEasing),
+                    animation = tween(1000, easing = LinearEasing),
                     repeatMode = RepeatMode.Restart
                 ),
                 label = "rotation"
             )
 
             val pulse by infiniteTransition.animateFloat(
-                initialValue = 1f,
-                targetValue = 1.15f,
+                initialValue = 0.95f,
+                targetValue = 1.05f,
                 animationSpec = infiniteRepeatable(
-                    animation = tween(800, easing = LinearEasing),
+                    animation = tween(600, easing = LinearEasing),
                     repeatMode = RepeatMode.Reverse
                 ),
                 label = "pulse"
@@ -454,9 +458,10 @@ fun ModernLoader(isVisible: Boolean, isTransition: Boolean = false) {
                     .then(if (isTransition) Modifier.padding(top = 24.dp) else Modifier),
                 contentAlignment = Alignment.Center
             ) {
+                // High-End Glowing Ring
                 Box(
                     modifier = Modifier
-                        .size(if (isTransition) 45.dp else 100.dp)
+                        .size(if (isTransition) 50.dp else 120.dp)
                         .rotate(rotation)
                         .background(
                             brush = Brush.sweepGradient(
@@ -475,18 +480,20 @@ fun ModernLoader(isVisible: Boolean, isTransition: Boolean = false) {
                         )
                 )
                 
+                // Enhanced Branded Core with Vector Logo
                 Box(
                     modifier = Modifier
-                        .size(if (isTransition) 28.dp else 60.dp)
+                        .size(if (isTransition) 32.dp else 80.dp)
                         .scale(pulse)
-                        .background(MaterialTheme.colorScheme.primary, shape = CircleShape),
+                        .background(Color.White, shape = CircleShape)
+                        .padding(2.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "CT",
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        fontWeight = FontWeight.ExtraBold,
-                        style = if (isTransition) MaterialTheme.typography.labelSmall else MaterialTheme.typography.titleLarge
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                        contentDescription = "Logo",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
                     )
                 }
             }
@@ -554,6 +561,7 @@ fun ExitConfirmationDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun CricketersTalesWebView(
@@ -564,6 +572,8 @@ fun CricketersTalesWebView(
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     var showSplashScreen by remember { mutableStateOf(true) }
     var isNavigating by remember { mutableStateOf(false) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    val pullToRefreshState = rememberPullToRefreshState()
 
     BackHandler(enabled = true) {
         if (webViewInstance?.canGoBack() == true) {
@@ -574,95 +584,101 @@ fun CricketersTalesWebView(
     }
 
     Box(modifier = modifier.statusBarsPadding()) {
-        AndroidView(
-            factory = { context ->
-                val swipeRefreshLayout = SwipeRefreshLayout(context)
-                val webView = WebView(context).apply {
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                    
-                    settings.apply {
-                        javaScriptEnabled = true
-                        domStorageEnabled = true
-                        databaseEnabled = true
-                        cacheMode = WebSettings.LOAD_DEFAULT 
-                        loadWithOverviewMode = true
-                        useWideViewPort = true
-                        setSupportZoom(true)
-                        builtInZoomControls = true
-                        displayZoomControls = false
-                    }
-
-                    webViewClient = object : WebViewClient() {
-                        override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                            super.onPageStarted(view, url, favicon)
-                            if (!showSplashScreen && !swipeRefreshLayout.isRefreshing) {
-                                isNavigating = true
-                            }
-                        }
-
-                        override fun onPageFinished(view: WebView?, url: String?) {
-                            super.onPageFinished(view, url)
-                            isNavigating = false
-                            showSplashScreen = false
-                            swipeRefreshLayout.isRefreshing = false
-                        }
-
-                        override fun onPageCommitVisible(view: WebView?, url: String?) {
-                            super.onPageCommitVisible(view, view?.url)
-                            showSplashScreen = false
-                            isNavigating = false
-                            swipeRefreshLayout.isRefreshing = false
-                        }
-
-                        override fun shouldOverrideUrlLoading(
-                            view: WebView?,
-                            request: WebResourceRequest?
-                        ): Boolean {
-                            val requestUrl = request?.url?.toString() ?: return false
-                            return if (requestUrl.contains("cricketerstales.com")) {
-                                false 
-                            } else {
-                                try {
-                                    val intent = Intent(Intent.ACTION_VIEW, requestUrl.toUri())
-                                    context.startActivity(intent)
-                                } catch (_: Exception) { }
-                                true
-                            }
-                        }
-                    }
-                    
-                    webChromeClient = object : android.webkit.WebChromeClient() {
-                        override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                            if (newProgress > 45) {
-                                showSplashScreen = false
-                                isNavigating = false
-                                swipeRefreshLayout.isRefreshing = false
-                            }
-                        }
-                    }
-
-                    loadUrl(url)
-                    webViewInstance = this
-                }
-
-                swipeRefreshLayout.apply {
-                    addView(webView)
-                    setOnRefreshListener {
-                        webView.reload()
-                    }
-                    viewTreeObserver.addOnScrollChangedListener {
-                        isEnabled = (webView.scrollY == 0)
-                    }
-                }
-                swipeRefreshLayout
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            state = pullToRefreshState,
+            onRefresh = {
+                isRefreshing = true
+                webViewInstance?.reload()
             },
             modifier = Modifier.fillMaxSize()
-        )
+        ) {
+            AndroidView(
+                factory = { context ->
+                    val swipeRefreshLayout = SwipeRefreshLayout(context)
+                    val webView = WebView(context).apply {
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                        
+                        settings.apply {
+                            javaScriptEnabled = true
+                            domStorageEnabled = true
+                            databaseEnabled = true
+                            cacheMode = WebSettings.LOAD_DEFAULT 
+                            loadWithOverviewMode = true
+                            useWideViewPort = true
+                            setSupportZoom(true)
+                            builtInZoomControls = true
+                            displayZoomControls = false
+                        }
 
-        ModernLoader(isVisible = showSplashScreen)
-        ModernLoader(isVisible = isNavigating, isTransition = true)
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                                super.onPageStarted(view, url, favicon)
+                                if (!showSplashScreen && !isRefreshing) {
+                                    isNavigating = true
+                                }
+                            }
+
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                super.onPageFinished(view, url)
+                                isNavigating = false
+                                showSplashScreen = false
+                                isRefreshing = false
+                            }
+
+                            override fun onPageCommitVisible(view: WebView?, url: String?) {
+                                super.onPageCommitVisible(view, view?.url)
+                                showSplashScreen = false
+                                isNavigating = false
+                                isRefreshing = false
+                            }
+
+                            override fun shouldOverrideUrlLoading(
+                                view: WebView?,
+                                request: WebResourceRequest?
+                            ): Boolean {
+                                val requestUrl = request?.url?.toString() ?: return false
+                                return if (requestUrl.contains("cricketerstales.com")) {
+                                    false 
+                                } else {
+                                    try {
+                                        val intent = Intent(Intent.ACTION_VIEW, requestUrl.toUri())
+                                        context.startActivity(intent)
+                                    } catch (_: Exception) { }
+                                    true
+                                }
+                            }
+                        }
+                        
+                        webChromeClient = object : android.webkit.WebChromeClient() {
+                            override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                                if (newProgress > 40) {
+                                    showSplashScreen = false
+                                    isNavigating = false
+                                    isRefreshing = false
+                                }
+                            }
+                        }
+
+                        loadUrl(url)
+                        webViewInstance = this
+                    }
+
+                    swipeRefreshLayout.apply {
+                        addView(webView)
+                        isEnabled = false 
+                    }
+                    swipeRefreshLayout
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        // Modern Unified Loader
+        ModernBrandedLoader(isVisible = showSplashScreen)
+        ModernBrandedLoader(isVisible = isNavigating && !isRefreshing, isTransition = true)
     }
 }

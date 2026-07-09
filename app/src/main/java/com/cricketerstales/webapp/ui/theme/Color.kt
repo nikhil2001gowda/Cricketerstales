@@ -2,6 +2,10 @@ package com.cricketerstales.webapp.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
+val LogoRed = Color(0xFFE53935)
+val LogoRedLight = Color(0xFFFF6F60)
+val LogoRedDark = Color(0xFFAB000D)
+
 val Purple80 = Color(0xFFD0BCFF)
 val PurpleGrey80 = Color(0xFFCCC2DC)
 val Pink80 = Color(0xFFEFB8C8)
