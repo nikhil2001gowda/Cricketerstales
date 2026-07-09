@@ -15,12 +15,25 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
@@ -41,7 +54,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -55,6 +73,7 @@ import com.google.android.play.core.install.InstallStateUpdatedListener
 import com.google.android.play.core.install.model.AppUpdateType
 import com.google.android.play.core.install.model.InstallStatus
 import com.google.android.play.core.install.model.UpdateAvailability
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -77,7 +96,7 @@ class MainActivity : ComponentActivity() {
                     contract = ActivityResultContracts.StartIntentSenderForResult()
                 ) { result ->
                     if (result.resultCode != Activity.RESULT_OK) {
-                        // If the update is canceled or fails, you can request to start the update again.
+                        // Update failed or cancelled
                     }
                 }
 
@@ -113,9 +132,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 when (isTermsAccepted) {
-                    null -> {
-                        // Loading preferences
-                    }
+                    null -> { /* Initial loading */ }
                     false -> {
                         TermsAndConditionsDialog(
                             onAccept = {
@@ -154,9 +171,75 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
+fun AdvancedLoadingScreen(isVisible: Boolean) {
+    AnimatedVisibility(
+        visible = isVisible,
+        exit = fadeOut(animationSpec = tween(1000))
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+            contentAlignment = Alignment.Center
+        ) {
+            val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+            val scale by infiniteTransition.animateFloat(
+                initialValue = 0.8f,
+                targetValue = 1.2f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1000),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "scale"
+            )
+            val alpha by infiniteTransition.animateFloat(
+                initialValue = 0.4f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1000),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "alpha"
+            )
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                // Pulse Animation (Simulating App Logo/Icon)
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .scale(scale)
+                        .alpha(alpha)
+                        .background(MaterialTheme.colorScheme.primary, shape = androidx.compose.foundation.shape.CircleShape)
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Text(
+                    text = "CricketersTales",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Loading your experience...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun TermsAndConditionsDialog(onAccept: () -> Unit, onDecline: () -> Unit) {
     AlertDialog(
-        onDismissRequest = { /* Don't allow dismiss by clicking outside */ },
+        onDismissRequest = { },
         title = {
             Text(text = "Welcome to CricketersTales", style = MaterialTheme.typography.headlineSmall)
         },
@@ -223,6 +306,7 @@ fun CricketersTalesWebView(
     var webView: WebView? by remember { mutableStateOf(null) }
     var progress by remember { mutableFloatStateOf(0f) }
     var isLoading by remember { mutableStateOf(true) }
+    var showSplashScreen by remember { mutableStateOf(true) }
 
     // Handle Back button
     BackHandler(enabled = true) {
@@ -250,6 +334,8 @@ fun CricketersTalesWebView(
                         override fun onPageFinished(view: WebView?, url: String?) {
                             super.onPageFinished(view, url)
                             isLoading = false
+                            // Smoothly hide splash screen after a small delay to ensure rendering
+                            postDelayed({ showSplashScreen = false }, 500)
                         }
 
                         override fun shouldOverrideUrlLoading(
@@ -258,15 +344,12 @@ fun CricketersTalesWebView(
                         ): Boolean {
                             val requestUrl = request?.url?.toString() ?: return false
                             return if (requestUrl.contains("cricketerstales.com")) {
-                                false // Load in WebView
+                                false 
                             } else {
-                                // Open external links in default browser
                                 try {
                                     val intent = Intent(Intent.ACTION_VIEW, requestUrl.toUri())
                                     context.startActivity(intent)
-                                } catch (_: Exception) {
-                                    // Handle cases where no browser is available
-                                }
+                                } catch (_: Exception) { }
                                 true
                             }
                         }
@@ -291,17 +374,17 @@ fun CricketersTalesWebView(
                     webView = this
                 }
             },
-            modifier = Modifier.fillMaxSize(),
-            update = {
-                // Instance is preserved
-            }
+            modifier = Modifier.fillMaxSize()
         )
 
-        if (isLoading) {
+        if (isLoading && !showSplashScreen) {
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier.fillMaxWidth()
             )
         }
+
+        // Advanced Loading Splash Screen
+        AdvancedLoadingScreen(isVisible = showSplashScreen)
     }
 }
