@@ -96,7 +96,6 @@ import androidx.core.net.toUri
 import com.cricketerstales.webapp.data.PreferenceManager
 import com.cricketerstales.webapp.ui.theme.CricketerstalesTheme
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -383,13 +382,13 @@ fun ModernLoader(isVisible: Boolean, isTransition: Boolean = false) {
 
             Box(
                 modifier = Modifier
-                    .then(if (isTransition) Modifier.padding(top = 16.dp) else Modifier),
+                    .then(if (isTransition) Modifier.padding(top = 24.dp) else Modifier),
                 contentAlignment = Alignment.Center
             ) {
-                // Modern Rotating Gradient Ring
+                // High-End Rotating Gradient Ring
                 Box(
                     modifier = Modifier
-                        .size(if (isTransition) 50.dp else 100.dp)
+                        .size(if (isTransition) 45.dp else 100.dp)
                         .rotate(rotation)
                         .background(
                             brush = Brush.sweepGradient(
@@ -403,7 +402,7 @@ fun ModernLoader(isVisible: Boolean, isTransition: Boolean = false) {
                         )
                         .padding(if (isTransition) 2.dp else 4.dp)
                         .background(
-                            if (isTransition) Color.White.copy(alpha = 0.8f) else MaterialTheme.colorScheme.background,
+                            if (isTransition) Color.White.copy(alpha = 0.9f) else MaterialTheme.colorScheme.background,
                             shape = CircleShape
                         )
                 )
@@ -411,7 +410,7 @@ fun ModernLoader(isVisible: Boolean, isTransition: Boolean = false) {
                 // Branded Core
                 Box(
                     modifier = Modifier
-                        .size(if (isTransition) 30.dp else 60.dp)
+                        .size(if (isTransition) 28.dp else 60.dp)
                         .scale(pulse)
                         .background(MaterialTheme.colorScheme.primary, shape = CircleShape),
                     contentAlignment = Alignment.Center
@@ -581,9 +580,10 @@ fun CricketersTalesWebView(
                         
                         webChromeClient = object : android.webkit.WebChromeClient() {
                             override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                                if (newProgress > 50) {
+                                if (newProgress > 45) { // Early exit for speed
                                     showSplashScreen = false
                                     isNavigating = false
+                                    isRefreshing = false
                                 }
                             }
                         }
@@ -596,10 +596,10 @@ fun CricketersTalesWebView(
             )
         }
 
-        // Ultra-Modern UI Components
+        // Modern Initial Splash (No text, no blur)
         ModernLoader(isVisible = showSplashScreen)
         
-        // Small transition loader at top center
-        ModernLoader(isVisible = isNavigating, isTransition = true)
+        // Branded Top-Center Transition Loader
+        ModernLoader(isVisible = isNavigating && !isRefreshing, isTransition = true)
     }
 }
