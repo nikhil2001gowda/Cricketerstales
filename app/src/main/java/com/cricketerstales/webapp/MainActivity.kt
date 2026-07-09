@@ -103,8 +103,9 @@ class MainActivity : ComponentActivity() {
     private var downloadId: Long = -1L
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+        // Immediate edge-to-edge
         enableEdgeToEdge()
+        super.onCreate(savedInstanceState)
         
         setContent {
             CricketerstalesTheme {
@@ -147,7 +148,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 when (isTermsAccepted) {
-                    null -> { /* Loading */ }
+                    null -> { /* Silent loading */ }
                     false -> {
                         TermsAndConditionsDialog(
                             onAccept = { scope.launch { preferenceManager.setTermsAccepted(true) } },
@@ -273,8 +274,7 @@ fun CustomUpdateDialog(onUpdate: () -> Unit, onDismiss: () -> Unit) {
         Surface(
             modifier = Modifier
                 .padding(24.dp)
-                .fillMaxWidth()
-                .wrapContentHeight(),
+                .fillMaxWidth(),
             shape = RoundedCornerShape(28.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp
@@ -345,8 +345,8 @@ fun CustomUpdateDialog(onUpdate: () -> Unit, onDismiss: () -> Unit) {
 fun AdvancedLoadingScreen(isVisible: Boolean, isTransition: Boolean = false) {
     AnimatedVisibility(
         visible = isVisible,
-        enter = fadeIn(animationSpec = tween(300)),
-        exit = fadeOut(animationSpec = tween(if (isTransition) 300 else 800))
+        enter = fadeIn(animationSpec = tween(150)),
+        exit = fadeOut(animationSpec = tween(if (isTransition) 150 else 300))
     ) {
         Box(
             modifier = Modifier
@@ -356,10 +356,10 @@ fun AdvancedLoadingScreen(isVisible: Boolean, isTransition: Boolean = false) {
         ) {
             val infiniteTransition = rememberInfiniteTransition(label = "pulse")
             val scale by infiniteTransition.animateFloat(
-                initialValue = 0.8f,
-                targetValue = 1.2f,
+                initialValue = 0.9f,
+                targetValue = 1.1f,
                 animationSpec = infiniteRepeatable(
-                    animation = tween(1000),
+                    animation = tween(700),
                     repeatMode = RepeatMode.Reverse
                 ),
                 label = "scale"
@@ -370,7 +370,6 @@ fun AdvancedLoadingScreen(isVisible: Boolean, isTransition: Boolean = false) {
                 verticalArrangement = Arrangement.Center
             ) {
                 if (isTransition) {
-                    // Circular indicator for page transitions
                     CircularProgressIndicator(
                         modifier = Modifier.size(64.dp),
                         color = MaterialTheme.colorScheme.primary,
@@ -384,16 +383,13 @@ fun AdvancedLoadingScreen(isVisible: Boolean, isTransition: Boolean = false) {
                         fontWeight = FontWeight.Bold
                     )
                 } else {
-                    // Full splash pulse
                     Box(
                         modifier = Modifier
-                            .size(100.dp)
+                            .size(90.dp)
                             .scale(scale)
                             .background(MaterialTheme.colorScheme.primary, shape = CircleShape)
                     )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
+                    Spacer(modifier = Modifier.height(20.dp))
                     Text(
                         text = "CricketersTales",
                         style = MaterialTheme.typography.headlineMedium,
@@ -474,7 +470,6 @@ fun CricketersTalesWebView(
     onShowExitDialog: () -> Unit
 ) {
     var webView: WebView? by remember { mutableStateOf(null) }
-    var progress by remember { mutableFloatStateOf(0f) }
     var isLoading by remember { mutableStateOf(true) }
     var showSplashScreen by remember { mutableStateOf(true) }
     var isNavigating by remember { mutableStateOf(false) }
@@ -508,11 +503,9 @@ fun CricketersTalesWebView(
                             super.onPageFinished(view, url)
                             isLoading = false
                             isNavigating = false
-                            if (showSplashScreen) {
-                                postDelayed({ showSplashScreen = false }, 500)
-                            }
+                            showSplashScreen = false
                         }
-
+                        
                         override fun shouldOverrideUrlLoading(
                             view: WebView?,
                             request: WebResourceRequest?
@@ -531,7 +524,11 @@ fun CricketersTalesWebView(
                     }
                     webChromeClient = object : android.webkit.WebChromeClient() {
                         override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                            progress = newProgress / 100f
+                            // Smart auto-hide as soon as page is mostly loaded (visible)
+                            if (newProgress > 60) {
+                                showSplashScreen = false
+                                isNavigating = false
+                            }
                         }
                     }
 
@@ -549,25 +546,14 @@ fun CricketersTalesWebView(
                     webView = this
                 }
             },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize().statusBarsPadding()
         )
 
-        // Loading and Progress Container - Fixed below status bar
-        Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
-            if (isLoading && !showSplashScreen && !isNavigating) {
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = Color.Transparent
-                )
-            }
+        // Ultra-fast Animations
+        if (showSplashScreen) {
+            AdvancedLoadingScreen(isVisible = true)
+        } else if (isNavigating) {
+            AdvancedLoadingScreen(isVisible = true, isTransition = true)
         }
-
-        // Full-screen Initial Splash
-        AdvancedLoadingScreen(isVisible = showSplashScreen)
-
-        // Smooth Overlay Transition with Circular Loader for internal clicks
-        AdvancedLoadingScreen(isVisible = isNavigating, isTransition = true)
     }
 }
