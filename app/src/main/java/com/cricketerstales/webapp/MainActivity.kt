@@ -18,12 +18,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -32,13 +34,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -89,6 +89,7 @@ import androidx.core.net.toUri
 import com.cricketerstales.webapp.data.PreferenceManager
 import com.cricketerstales.webapp.ui.theme.CricketerstalesTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -115,7 +116,6 @@ class MainActivity : ComponentActivity() {
                 var showExitDialog by remember { mutableStateOf(false) }
                 var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
 
-                // Check for updates from GitHub API
                 LaunchedEffect(Unit) {
                     val info = checkForUpdates(context)
                     if (info != null) {
@@ -123,7 +123,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // Register Download Complete Listener
                 DisposableEffect(Unit) {
                     val onDownloadComplete = object : BroadcastReceiver() {
                         override fun onReceive(context: Context, intent: Intent) {
@@ -162,9 +161,7 @@ class MainActivity : ComponentActivity() {
                         ) { _ ->
                             CricketersTalesWebView(
                                 url = "https://cricketerstales.com/",
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .statusBarsPadding(), // Ensures content starts below the status bar
+                                modifier = Modifier.fillMaxSize(),
                                 onShowExitDialog = { showExitDialog = true }
                             )
                         }
@@ -201,7 +198,7 @@ class MainActivity : ComponentActivity() {
             if (connection.responseCode == 200) {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
                 val json = JSONObject(response)
-                val tagName = json.getString("tag_name") // e.g., "v1.0.1"
+                val tagName = json.getString("tag_name")
                 val latestVersion = tagName.removePrefix("v").trim()
                 val currentVersion = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.0.0"
                 
@@ -275,7 +272,8 @@ fun CustomUpdateDialog(onUpdate: () -> Unit, onDismiss: () -> Unit) {
         Surface(
             modifier = Modifier
                 .padding(24.dp)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .wrapContentHeight(),
             shape = RoundedCornerShape(28.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp
@@ -343,15 +341,16 @@ fun CustomUpdateDialog(onUpdate: () -> Unit, onDismiss: () -> Unit) {
 }
 
 @Composable
-fun AdvancedLoadingScreen(isVisible: Boolean) {
+fun AdvancedLoadingScreen(isVisible: Boolean, isTransition: Boolean = false) {
     AnimatedVisibility(
         visible = isVisible,
-        exit = fadeOut(animationSpec = tween(1000))
+        enter = fadeIn(animationSpec = tween(300)),
+        exit = fadeOut(animationSpec = tween(if (isTransition) 300 else 800))
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
+                .background(if (isTransition) Color.Black.copy(alpha = 0.3f) else MaterialTheme.colorScheme.background),
             contentAlignment = Alignment.Center
         ) {
             val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -364,44 +363,36 @@ fun AdvancedLoadingScreen(isVisible: Boolean) {
                 ),
                 label = "scale"
             )
-            val alpha by infiniteTransition.animateFloat(
-                initialValue = 0.4f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(1000),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "alpha"
-            )
-
+            
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .scale(scale)
-                        .alpha(alpha)
-                        .background(MaterialTheme.colorScheme.primary, shape = CircleShape)
-                )
+                if (isTransition) {
+                    // Small spinning indicator for page transitions
+                    LinearProgressIndicator(
+                        modifier = Modifier.width(150.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    )
+                } else {
+                    // Full splash pulse
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .scale(scale)
+                            .background(MaterialTheme.colorScheme.primary, shape = CircleShape)
+                    )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
 
-                Text(
-                    text = "CricketersTales",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "Loading...",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                    Text(
+                        text = "CricketersTales",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         }
     }
@@ -478,6 +469,7 @@ fun CricketersTalesWebView(
     var progress by remember { mutableFloatStateOf(0f) }
     var isLoading by remember { mutableStateOf(true) }
     var showSplashScreen by remember { mutableStateOf(true) }
+    var isNavigating by remember { mutableStateOf(false) }
 
     BackHandler(enabled = true) {
         if (webView?.canGoBack() == true) {
@@ -498,13 +490,19 @@ fun CricketersTalesWebView(
                     webViewClient = object : WebViewClient() {
                         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                             super.onPageStarted(view, url, favicon)
+                            if (!showSplashScreen) {
+                                isNavigating = true
+                            }
                             isLoading = true
                         }
 
                         override fun onPageFinished(view: WebView?, url: String?) {
                             super.onPageFinished(view, url)
                             isLoading = false
-                            postDelayed({ showSplashScreen = false }, 500)
+                            isNavigating = false
+                            if (showSplashScreen) {
+                                postDelayed({ showSplashScreen = false }, 500)
+                            }
                         }
 
                         override fun shouldOverrideUrlLoading(
@@ -546,15 +544,22 @@ fun CricketersTalesWebView(
             modifier = Modifier.fillMaxSize()
         )
 
-        if (isLoading && !showSplashScreen) {
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 32.dp)
-            )
+        // Loading and Progress Container - Fixed below status bar
+        Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
+            if (isLoading && !showSplashScreen && !isNavigating) {
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = Color.Transparent
+                )
+            }
         }
 
+        // Full-screen Initial Splash
         AdvancedLoadingScreen(isVisible = showSplashScreen)
+
+        // Smooth Overlay Transition for internal clicks
+        AdvancedLoadingScreen(isVisible = isNavigating, isTransition = true)
     }
 }
