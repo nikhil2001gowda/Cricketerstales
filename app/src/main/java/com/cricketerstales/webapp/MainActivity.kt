@@ -95,7 +95,6 @@ class MainActivity : ComponentActivity() {
                 val isTermsAccepted by preferenceManager.isTermsAccepted.collectAsState(initial = null)
                 val scope = rememberCoroutineScope()
                 
-                var showExitDialog by remember { mutableStateOf(false) }
                 var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
                 var showInstallDialog by remember { mutableStateOf(false) }
 
@@ -136,16 +135,8 @@ class MainActivity : ComponentActivity() {
                         Box(modifier = Modifier.fillMaxSize()) {
                             CricketersTalesWebView(
                                 url = "https://cricketerstales.com/",
-                                modifier = Modifier.fillMaxSize(),
-                                onShowExitDialog = { showExitDialog = true }
+                                modifier = Modifier.fillMaxSize()
                             )
-
-                            if (showExitDialog) {
-                                ExitConfirmationDialog(
-                                    onConfirm = { finish() },
-                                    onDismiss = { showExitDialog = false }
-                                )
-                            }
 
                             updateInfo?.let { info ->
                                 CustomUpdateDialog(
@@ -544,36 +535,12 @@ fun TermsAndConditionsDialog(onAccept: () -> Unit, onDecline: () -> Unit) {
     )
 }
 
-@Composable
-fun ExitConfirmationDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(text = "Exit App?", style = MaterialTheme.typography.headlineSmall)
-        },
-        text = {
-            Text(text = "Do you really want to exit the CricketersTales app?")
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text("Exit", color = MaterialTheme.colorScheme.error)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Stay")
-            }
-        }
-    )
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun CricketersTalesWebView(
     url: String, 
-    modifier: Modifier = Modifier,
-    onShowExitDialog: () -> Unit
+    modifier: Modifier = Modifier
 ) {
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     var showSplashScreen by remember { mutableStateOf(true) }
@@ -581,12 +548,13 @@ fun CricketersTalesWebView(
     var isRefreshing by remember { mutableStateOf(false) }
     val pullToRefreshState = rememberPullToRefreshState()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     BackHandler(enabled = true) {
         if (webViewInstance?.canGoBack() == true) {
             webViewInstance?.goBack()
         } else {
-            onShowExitDialog()
+            (context as? android.app.Activity)?.finish()
         }
     }
 
