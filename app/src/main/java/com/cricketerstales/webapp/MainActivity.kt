@@ -19,10 +19,8 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -42,8 +40,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -179,7 +175,7 @@ class MainActivity : ComponentActivity() {
             if (connection.responseCode == 200) {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
                 val json = JSONObject(response)
-                val tagName = json.getString("tag_name")
+                val tagName = json.getString("tag_name") 
                 val latestVersion = tagName.removePrefix("v").trim()
                 val currentVersion = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.0.0"
                 
@@ -455,7 +451,7 @@ fun ModernLoader(isVisible: Boolean, isTransition: Boolean = false) {
                     .then(if (isTransition) Modifier.padding(top = 24.dp) else Modifier),
                 contentAlignment = Alignment.Center
             ) {
-                // Modern Rotating Gradient Ring
+                // Rotating Ring
                 Box(
                     modifier = Modifier
                         .size(if (isTransition) 45.dp else 100.dp)
@@ -557,7 +553,6 @@ fun ExitConfirmationDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun CricketersTalesWebView(
@@ -568,8 +563,6 @@ fun CricketersTalesWebView(
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     var showSplashScreen by remember { mutableStateOf(true) }
     var isNavigating by remember { mutableStateOf(false) }
-    var isRefreshing by remember { mutableStateOf(false) }
-    val pullToRefreshState = rememberPullToRefreshState()
 
     BackHandler(enabled = true) {
         if (webViewInstance?.canGoBack() == true) {
@@ -580,103 +573,97 @@ fun CricketersTalesWebView(
     }
 
     Box(modifier = modifier.statusBarsPadding()) {
-        PullToRefreshBox(
-            isRefreshing = isRefreshing,
-            state = pullToRefreshState,
-            onRefresh = {
-                isRefreshing = true
-                webViewInstance?.reload()
+        AndroidView(
+            factory = { context ->
+                val swipeRefreshLayout = SwipeRefreshLayout(context)
+                val webView = WebView(context).apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    
+                    settings.apply {
+                        javaScriptEnabled = true
+                        domStorageEnabled = true
+                        databaseEnabled = true
+                        cacheMode = WebSettings.LOAD_DEFAULT 
+                        loadWithOverviewMode = true
+                        useWideViewPort = true
+                        setSupportZoom(true)
+                        builtInZoomControls = true
+                        displayZoomControls = false
+                    }
+
+                    webViewClient = object : WebViewClient() {
+                        override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                            super.onPageStarted(view, url, favicon)
+                            if (!showSplashScreen && !swipeRefreshLayout.isRefreshing) {
+                                isNavigating = true
+                            }
+                        }
+
+                        override fun onPageFinished(view: WebView?, url: String?) {
+                            super.onPageFinished(view, url)
+                            isNavigating = false
+                            showSplashScreen = false
+                            swipeRefreshLayout.isRefreshing = false
+                        }
+
+                        override fun onPageCommitVisible(view: WebView?, url: String?) {
+                            super.onPageCommitVisible(view, view?.url)
+                            showSplashScreen = false
+                            isNavigating = false
+                            swipeRefreshLayout.isRefreshing = false
+                        }
+
+                        override fun shouldOverrideUrlLoading(
+                            view: WebView?,
+                            request: WebResourceRequest?
+                        ): Boolean {
+                            val requestUrl = request?.url?.toString() ?: return false
+                            return if (requestUrl.contains("cricketerstales.com")) {
+                                false 
+                            } else {
+                                try {
+                                    val intent = Intent(Intent.ACTION_VIEW, requestUrl.toUri())
+                                    context.startActivity(intent)
+                                } catch (_: Exception) { }
+                                true
+                            }
+                        }
+                    }
+                    
+                    webChromeClient = object : android.webkit.WebChromeClient() {
+                        override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                            if (newProgress > 50) {
+                                showSplashScreen = false
+                                isNavigating = false
+                                swipeRefreshLayout.isRefreshing = false
+                            }
+                        }
+                    }
+
+                    loadUrl(url)
+                    webViewInstance = this
+                }
+
+                swipeRefreshLayout.apply {
+                    addView(webView)
+                    setOnRefreshListener {
+                        webView.reload()
+                    }
+                    // Crucial: Only enable pull-to-refresh when at the very top of the site
+                    // We use the View's scroll position for consistency
+                    viewTreeObserver.addOnScrollChangedListener {
+                        isEnabled = (webView.scrollY == 0)
+                    }
+                }
+                swipeRefreshLayout
             },
             modifier = Modifier.fillMaxSize()
-        ) {
-            AndroidView(
-                factory = { context ->
-                    val swipeRefreshLayout = SwipeRefreshLayout(context)
-                    val webView = WebView(context).apply {
-                        layoutParams = ViewGroup.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT
-                        )
-                        
-                        settings.apply {
-                            javaScriptEnabled = true
-                            domStorageEnabled = true
-                            databaseEnabled = true
-                            cacheMode = WebSettings.LOAD_DEFAULT 
-                            loadWithOverviewMode = true
-                            useWideViewPort = true
-                            setSupportZoom(true)
-                            builtInZoomControls = true
-                            displayZoomControls = false
-                        }
+        )
 
-                        webViewClient = object : WebViewClient() {
-                            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                                super.onPageStarted(view, url, favicon)
-                                if (!showSplashScreen && !swipeRefreshLayout.isRefreshing) {
-                                    isNavigating = true
-                                }
-                            }
-
-                            override fun onPageFinished(view: WebView?, url: String?) {
-                                super.onPageFinished(view, url)
-                                isNavigating = false
-                                showSplashScreen = false
-                                swipeRefreshLayout.isRefreshing = false
-                                isRefreshing = false
-                            }
-
-                            override fun onPageCommitVisible(view: WebView?, url: String?) {
-                                super.onPageCommitVisible(view, view?.url)
-                                showSplashScreen = false
-                                isNavigating = false
-                                swipeRefreshLayout.isRefreshing = false
-                                isRefreshing = false
-                            }
-
-                            override fun shouldOverrideUrlLoading(
-                                view: WebView?,
-                                request: WebResourceRequest?
-                            ): Boolean {
-                                val requestUrl = request?.url?.toString() ?: return false
-                                return if (requestUrl.contains("cricketerstales.com")) {
-                                    false 
-                                } else {
-                                    try {
-                                        val intent = Intent(Intent.ACTION_VIEW, requestUrl.toUri())
-                                        context.startActivity(intent)
-                                    } catch (_: Exception) { }
-                                    true
-                                }
-                            }
-                        }
-                        
-                        webChromeClient = object : android.webkit.WebChromeClient() {
-                            override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                                if (newProgress > 45) {
-                                    showSplashScreen = false
-                                    isNavigating = false
-                                    swipeRefreshLayout.isRefreshing = false
-                                    isRefreshing = false
-                                }
-                            }
-                        }
-
-                        loadUrl(url)
-                        webViewInstance = this
-                    }
-
-                    swipeRefreshLayout.apply {
-                        addView(webView)
-                        isEnabled = false // Disable native swipe, we use PullToRefreshBox
-                    }
-                    swipeRefreshLayout
-                },
-                modifier = Modifier.fillMaxSize()
-            )
-        }
-
-        // Modern Initial Splash
+        // Initial Splash
         ModernLoader(isVisible = showSplashScreen)
         
         // Branded Top-Center Transition Loader
