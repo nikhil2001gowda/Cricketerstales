@@ -21,14 +21,15 @@
         </aapt:attr>
     </path>
 
-    <!-- Stylized Modern Interlocking "CT"
-         Based on user provided drawing: Rounded corners and touching/flowing design -->
+    <!-- Rescaled Interlocking CT (Reduced size to fit better in circles) -->
     <group
-        android:translateX="4"
-        android:translateY="4">
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="0.85"
+        android:scaleY="0.85"
+        android:translateX="0"
+        android:translateY="0">
 
-        <!-- Interlocking CT Flow Path -->
-        <!-- This path combines C and T into a single modern silhouette -->
         <path
             android:fillColor="#FFFFFF"
             android:pathData="M48,32 L34,32 C26,32 20,38 20,46 L20,58 C20,66 26,72 34,72 L48,72 L48,60 L36,60 C33,60 32,58 32,56 L32,48 C32,46 33,44 36,44 L48,44 L48,32 Z M50,32 L84,32 L84,44 L73,44 L73,72 L61,72 L61,44 L50,44 L50,32 Z" />
