@@ -26,16 +26,26 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -43,6 +53,7 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -62,18 +73,23 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.net.toUri
 import com.cricketerstales.webapp.data.PreferenceManager
 import com.cricketerstales.webapp.ui.theme.CricketerstalesTheme
+import com.google.android.play.core.appupdate.AppUpdateInfo
+import com.google.android.play.core.appupdate.AppUpdateManager
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory
 import com.google.android.play.core.appupdate.AppUpdateOptions
 import com.google.android.play.core.install.InstallStateUpdatedListener
 import com.google.android.play.core.install.model.AppUpdateType
 import com.google.android.play.core.install.model.InstallStatus
 import com.google.android.play.core.install.model.UpdateAvailability
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -89,6 +105,7 @@ class MainActivity : ComponentActivity() {
                 val snackbarHostState = remember { SnackbarHostState() }
                 
                 var showExitDialog by remember { mutableStateOf(false) }
+                var showUpdateDialog by remember { mutableStateOf<AppUpdateInfo?>(null) }
 
                 // In-App Update Logic
                 val appUpdateManager = remember { AppUpdateManagerFactory.create(context) }
@@ -96,7 +113,7 @@ class MainActivity : ComponentActivity() {
                     contract = ActivityResultContracts.StartIntentSenderForResult()
                 ) { result ->
                     if (result.resultCode != Activity.RESULT_OK) {
-                        // Update failed or cancelled
+                        // Handle update failure/cancellation
                     }
                 }
 
@@ -106,11 +123,8 @@ class MainActivity : ComponentActivity() {
                         if (appUpdateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
                             && appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)
                         ) {
-                            appUpdateManager.startUpdateFlowForResult(
-                                appUpdateInfo,
-                                updateLauncher,
-                                AppUpdateOptions.newBuilder(AppUpdateType.FLEXIBLE).build()
-                            )
+                            // Show custom cool update dialog instead of immediate flow
+                            showUpdateDialog = appUpdateInfo
                         }
                     }
 
@@ -118,7 +132,7 @@ class MainActivity : ComponentActivity() {
                         if (state.installStatus() == InstallStatus.DOWNLOADED) {
                             scope.launch {
                                 val result = snackbarHostState.showSnackbar(
-                                    message = "An update has just been downloaded.",
+                                    message = "Update ready to install!",
                                     actionLabel = "RESTART",
                                     duration = SnackbarDuration.Indefinite
                                 )
@@ -132,7 +146,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 when (isTermsAccepted) {
-                    null -> { /* Initial loading */ }
+                    null -> { /* Loading */ }
                     false -> {
                         TermsAndConditionsDialog(
                             onAccept = {
@@ -163,12 +177,107 @@ class MainActivity : ComponentActivity() {
                                 onDismiss = { showExitDialog = false }
                             )
                         }
+
+                        showUpdateDialog?.let { info ->
+                            CustomUpdateDialog(
+                                onUpdate = {
+                                    showUpdateDialog = null
+                                    appUpdateManager.startUpdateFlowForResult(
+                                        info,
+                                        updateLauncher,
+                                        AppUpdateOptions.newBuilder(AppUpdateType.FLEXIBLE).build()
+                                    )
+                                },
+                                onDismiss = { showUpdateDialog = null }
+                            )
+                        }
                     }
                 }
             }
         }
     }
 }
+
+@Composable
+fun CustomUpdateDialog(onUpdate: () -> Unit, onDismiss: () -> Unit) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .padding(24.dp)
+                .fillMaxWidth()
+                .wrapContentHeight(),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Cool Icon with Circle
+                Surface(
+                    modifier = Modifier.size(80.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.SystemUpdate,
+                            contentDescription = null,
+                            modifier = Modifier.size(40.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Text(
+                    text = "New Update Available!",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = "A new version of CricketersTales is ready. Update now to get the latest features and a smoother experience.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Later", color = MaterialTheme.colorScheme.secondary)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = onUpdate,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Text("Update Now", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Extension to help with wrapContentHeight since it's not directly in Modifier
+fun Modifier.wrapContentHeight() = this.then(Modifier.height(androidx.compose.ui.unit.Dp.Unspecified))
 
 @Composable
 fun AdvancedLoadingScreen(isVisible: Boolean) {
@@ -206,13 +315,12 @@ fun AdvancedLoadingScreen(isVisible: Boolean) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Pulse Animation (Simulating App Logo/Icon)
                 Box(
                     modifier = Modifier
                         .size(100.dp)
                         .scale(scale)
                         .alpha(alpha)
-                        .background(MaterialTheme.colorScheme.primary, shape = androidx.compose.foundation.shape.CircleShape)
+                        .background(MaterialTheme.colorScheme.primary, shape = CircleShape)
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -308,7 +416,6 @@ fun CricketersTalesWebView(
     var isLoading by remember { mutableStateOf(true) }
     var showSplashScreen by remember { mutableStateOf(true) }
 
-    // Handle Back button
     BackHandler(enabled = true) {
         if (webView?.canGoBack() == true) {
             webView?.goBack()
@@ -334,7 +441,6 @@ fun CricketersTalesWebView(
                         override fun onPageFinished(view: WebView?, url: String?) {
                             super.onPageFinished(view, url)
                             isLoading = false
-                            // Smoothly hide splash screen after a small delay to ensure rendering
                             postDelayed({ showSplashScreen = false }, 500)
                         }
 
@@ -384,7 +490,6 @@ fun CricketersTalesWebView(
             )
         }
 
-        // Advanced Loading Splash Screen
         AdvancedLoadingScreen(isVisible = showSplashScreen)
     }
 }
