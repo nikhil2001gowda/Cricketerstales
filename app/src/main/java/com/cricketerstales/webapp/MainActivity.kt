@@ -8,11 +8,14 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.net.Uri
+import android.net.http.SslError
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
 import android.view.ViewGroup
+import android.webkit.SslErrorHandler
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -67,12 +70,14 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.cricketerstales.webapp.data.PreferenceManager
 import com.cricketerstales.webapp.ui.theme.CricketerstalesTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import kotlin.time.Duration.Companion.milliseconds
 
 class MainActivity : ComponentActivity() {
 
@@ -119,7 +124,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 when (isTermsAccepted) {
-                    null -> { /* Background check */ }
+                    null -> { /* Silent loading */ }
                     false -> {
                         TermsAndConditionsDialog(
                             onAccept = { scope.launch { preferenceManager.setTermsAccepted(true) } },
@@ -423,12 +428,12 @@ fun ModernBrandedLoader(isVisible: Boolean, isTransition: Boolean = false) {
     AnimatedVisibility(
         visible = isVisible,
         enter = fadeIn(animationSpec = tween(100)),
-        exit = fadeOut(animationSpec = tween(300))
+        exit = fadeOut(animationSpec = tween(200))
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(if (isTransition) Color.Black.copy(alpha = 0.4f) else MaterialTheme.colorScheme.background),
+                .background(if (isTransition) Color.Transparent else MaterialTheme.colorScheme.background),
             contentAlignment = if (isTransition) Alignment.TopCenter else Alignment.Center
         ) {
             val infiniteTransition = rememberInfiniteTransition(label = "branded_loader")
@@ -461,7 +466,7 @@ fun ModernBrandedLoader(isVisible: Boolean, isTransition: Boolean = false) {
                 // High-End Glowing Ring
                 Box(
                     modifier = Modifier
-                        .size(if (isTransition) 50.dp else 120.dp)
+                        .size(if (isTransition) 45.dp else 110.dp)
                         .rotate(rotation)
                         .background(
                             brush = Brush.sweepGradient(
@@ -480,10 +485,10 @@ fun ModernBrandedLoader(isVisible: Boolean, isTransition: Boolean = false) {
                         )
                 )
                 
-                // Enhanced Branded Core with Vector Logo
+                // Branded Core
                 Box(
                     modifier = Modifier
-                        .size(if (isTransition) 32.dp else 80.dp)
+                        .size(if (isTransition) 28.dp else 75.dp)
                         .scale(pulse)
                         .background(Color.White, shape = CircleShape)
                         .padding(2.dp),
@@ -574,6 +579,7 @@ fun CricketersTalesWebView(
     var isNavigating by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
     val pullToRefreshState = rememberPullToRefreshState()
+    val scope = rememberCoroutineScope()
 
     BackHandler(enabled = true) {
         if (webViewInstance?.canGoBack() == true) {
@@ -595,7 +601,6 @@ fun CricketersTalesWebView(
         ) {
             AndroidView(
                 factory = { context ->
-                    val swipeRefreshLayout = SwipeRefreshLayout(context)
                     val webView = WebView(context).apply {
                         layoutParams = ViewGroup.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -612,9 +617,15 @@ fun CricketersTalesWebView(
                             setSupportZoom(true)
                             builtInZoomControls = true
                             displayZoomControls = false
+                            
+                            // Speed optimizations
+                            offscreenPreRaster = true
+                            layoutAlgorithm = WebSettings.LayoutAlgorithm.TEXT_AUTOSIZING
                         }
 
                         webViewClient = object : WebViewClient() {
+                            private var errorCount = 0
+
                             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                                 super.onPageStarted(view, url, favicon)
                                 if (!showSplashScreen && !isRefreshing) {
@@ -627,6 +638,7 @@ fun CricketersTalesWebView(
                                 isNavigating = false
                                 showSplashScreen = false
                                 isRefreshing = false
+                                errorCount = 0
                             }
 
                             override fun onPageCommitVisible(view: WebView?, url: String?) {
@@ -634,6 +646,30 @@ fun CricketersTalesWebView(
                                 showSplashScreen = false
                                 isNavigating = false
                                 isRefreshing = false
+                            }
+
+                            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
+                                if (request?.isForMainFrame == true && errorCount < 3) {
+                                    errorCount++
+                                    scope.launch {
+                                        delay(2000.milliseconds)
+                                        view?.reload()
+                                    }
+                                }
+                                super.onReceivedError(view, request, error)
+                            }
+
+                            override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
+                                if (errorCount < 2) {
+                                    errorCount++
+                                    handler?.cancel()
+                                    scope.launch {
+                                        delay(1000.milliseconds)
+                                        view?.reload()
+                                    }
+                                } else {
+                                    super.onReceivedSslError(view, handler, error)
+                                }
                             }
 
                             override fun shouldOverrideUrlLoading(
@@ -655,7 +691,7 @@ fun CricketersTalesWebView(
                         
                         webChromeClient = object : android.webkit.WebChromeClient() {
                             override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                                if (newProgress > 40) {
+                                if (newProgress > 45) {
                                     showSplashScreen = false
                                     isNavigating = false
                                     isRefreshing = false
@@ -666,19 +702,16 @@ fun CricketersTalesWebView(
                         loadUrl(url)
                         webViewInstance = this
                     }
-
-                    swipeRefreshLayout.apply {
-                        addView(webView)
-                        isEnabled = false 
-                    }
-                    swipeRefreshLayout
+                    webView
                 },
                 modifier = Modifier.fillMaxSize()
             )
         }
 
-        // Modern Unified Loader
+        // Modern Initial Splash
         ModernBrandedLoader(isVisible = showSplashScreen)
+        
+        // Branded Top-Center Transition Loader
         ModernBrandedLoader(isVisible = isNavigating && !isRefreshing, isTransition = true)
     }
 }
