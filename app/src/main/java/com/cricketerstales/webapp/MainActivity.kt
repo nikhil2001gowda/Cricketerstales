@@ -20,6 +20,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -51,9 +52,7 @@ import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -68,7 +67,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -76,7 +74,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -86,11 +85,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
-import androidx.core.net.toUri
 import com.cricketerstales.webapp.data.PreferenceManager
 import com.cricketerstales.webapp.ui.theme.CricketerstalesTheme
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -103,7 +100,6 @@ class MainActivity : ComponentActivity() {
     private var downloadId: Long = -1L
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Immediate edge-to-edge
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         
@@ -342,61 +338,93 @@ fun CustomUpdateDialog(onUpdate: () -> Unit, onDismiss: () -> Unit) {
 }
 
 @Composable
-fun AdvancedLoadingScreen(isVisible: Boolean, isTransition: Boolean = false) {
+fun ModernLoader(isVisible: Boolean, isTransition: Boolean = false) {
     AnimatedVisibility(
         visible = isVisible,
         enter = fadeIn(animationSpec = tween(150)),
-        exit = fadeOut(animationSpec = tween(if (isTransition) 150 else 300))
+        exit = fadeOut(animationSpec = tween(300))
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(if (isTransition) Color.Black.copy(alpha = 0.5f) else MaterialTheme.colorScheme.background),
+                .background(if (isTransition) Color.Black.copy(alpha = 0.6f) else MaterialTheme.colorScheme.background),
             contentAlignment = Alignment.Center
         ) {
-            val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-            val scale by infiniteTransition.animateFloat(
-                initialValue = 0.9f,
-                targetValue = 1.1f,
+            val infiniteTransition = rememberInfiniteTransition(label = "modern_loader")
+            
+            val rotation by infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 360f,
                 animationSpec = infiniteRepeatable(
-                    animation = tween(700),
+                    animation = tween(1200, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "rotation"
+            )
+
+            val pulse by infiniteTransition.animateFloat(
+                initialValue = 1f,
+                targetValue = 1.15f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(800, easing = LinearEasing),
                     repeatMode = RepeatMode.Reverse
                 ),
-                label = "scale"
+                label = "pulse"
             )
-            
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                if (isTransition) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(64.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        strokeWidth = 4.dp
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Loading...",
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                } else {
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    modifier = Modifier.size(100.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Modern Rotating Gradient Ring
                     Box(
                         modifier = Modifier
-                            .size(90.dp)
-                            .scale(scale)
-                            .background(MaterialTheme.colorScheme.primary, shape = CircleShape)
+                            .fillMaxSize()
+                            .rotate(rotation)
+                            .background(
+                                brush = Brush.sweepGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                        MaterialTheme.colorScheme.primary,
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                    )
+                                ),
+                                shape = CircleShape
+                            )
+                            .padding(4.dp)
+                            .background(
+                                if (isTransition) Color.Transparent else MaterialTheme.colorScheme.background,
+                                shape = CircleShape
+                            )
                     )
-                    Spacer(modifier = Modifier.height(20.dp))
-                    Text(
-                        text = "CricketersTales",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    
+                    // Branded Core
+                    Box(
+                        modifier = Modifier
+                            .size(60.dp)
+                            .scale(pulse)
+                            .background(MaterialTheme.colorScheme.primary, shape = CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "CT",
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            fontWeight = FontWeight.ExtraBold,
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                    }
                 }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Text(
+                    text = if (isTransition) "Loading Page..." else "CricketersTales",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isTransition) Color.White else MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.alpha(pulse)
+                )
             }
         }
     }
@@ -470,7 +498,6 @@ fun CricketersTalesWebView(
     onShowExitDialog: () -> Unit
 ) {
     var webView: WebView? by remember { mutableStateOf(null) }
-    var isLoading by remember { mutableStateOf(true) }
     var showSplashScreen by remember { mutableStateOf(true) }
     var isNavigating by remember { mutableStateOf(false) }
 
@@ -482,7 +509,7 @@ fun CricketersTalesWebView(
         }
     }
 
-    Box(modifier = modifier) {
+    Box(modifier = modifier.statusBarsPadding()) { // Ensure top-level padding
         AndroidView(
             factory = { context ->
                 WebView(context).apply {
@@ -496,36 +523,18 @@ fun CricketersTalesWebView(
                             if (!showSplashScreen) {
                                 isNavigating = true
                             }
-                            isLoading = true
                         }
 
                         override fun onPageFinished(view: WebView?, url: String?) {
                             super.onPageFinished(view, url)
-                            isLoading = false
                             isNavigating = false
                             showSplashScreen = false
-                        }
-                        
-                        override fun shouldOverrideUrlLoading(
-                            view: WebView?,
-                            request: WebResourceRequest?
-                        ): Boolean {
-                            val requestUrl = request?.url?.toString() ?: return false
-                            return if (requestUrl.contains("cricketerstales.com")) {
-                                false 
-                            } else {
-                                try {
-                                    val intent = Intent(Intent.ACTION_VIEW, requestUrl.toUri())
-                                    context.startActivity(intent)
-                                } catch (_: Exception) { }
-                                true
-                            }
                         }
                     }
                     webChromeClient = object : android.webkit.WebChromeClient() {
                         override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                            // Smart auto-hide as soon as page is mostly loaded (visible)
-                            if (newProgress > 60) {
+                            // Smart-hide at 50% for instant feeling
+                            if (newProgress > 50) {
                                 showSplashScreen = false
                                 isNavigating = false
                             }
@@ -546,14 +555,11 @@ fun CricketersTalesWebView(
                     webView = this
                 }
             },
-            modifier = Modifier.fillMaxSize().statusBarsPadding()
+            modifier = Modifier.fillMaxSize()
         )
 
-        // Ultra-fast Animations
-        if (showSplashScreen) {
-            AdvancedLoadingScreen(isVisible = true)
-        } else if (isNavigating) {
-            AdvancedLoadingScreen(isVisible = true, isTransition = true)
-        }
+        // Modern UI Components
+        ModernLoader(isVisible = showSplashScreen)
+        ModernLoader(isVisible = isNavigating, isTransition = true)
     }
 }

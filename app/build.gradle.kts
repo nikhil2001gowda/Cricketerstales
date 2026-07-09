@@ -3,11 +3,12 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-// Read version information from GitHub environment variables if they exist
-val githubRunNumber = System.getenv("GITHUB_RUN_NUMBER") ?: "1"
-val baseVersion = "1.0"
-val autoVersionName = "$baseVersion.$githubRunNumber"
-val autoVersionCode = githubRunNumber.toInt()
+// v1.x versioning scheme
+val githubRunNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "0").toInt()
+val majorVersion = "1"
+// Result: 1.0, 1.1, 1.2...
+val autoVersionName = "$majorVersion.$githubRunNumber"
+val autoVersionCode = githubRunNumber + 100
 
 android {
     namespace = "com.cricketerstales.webapp"
