@@ -488,7 +488,7 @@ fun ModernBrandedLoader(isVisible: Boolean, isTransition: Boolean = false) {
 
             Box(
                 modifier = Modifier
-                    .then(if (isTransition) Modifier.padding(top = 24.dp) else Modifier),
+                    .then(if (isTransition) Modifier.padding(top = 70.dp) else Modifier),
                 contentAlignment = Alignment.Center
             ) {
                 // Rotating Ring
@@ -693,6 +693,7 @@ fun CricketersTalesWebView(
                         override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                             val requestUrl = request?.url?.toString() ?: return false
                             return if (requestUrl.contains("cricketerstales.com")) {
+                                isNavigating = true
                                 false 
                             } else {
                                 try {
@@ -706,6 +707,11 @@ fun CricketersTalesWebView(
                     
                     webChromeClient = object : android.webkit.WebChromeClient() {
                         override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                            if (newProgress > 0 && newProgress < 40) {
+                                if (!showSplashScreen && !swipeRefreshLayout.isRefreshing) {
+                                    isNavigating = true
+                                }
+                            }
                             if (newProgress > 40) {
                                 showSplashScreen = false
                                 isNavigating = false
