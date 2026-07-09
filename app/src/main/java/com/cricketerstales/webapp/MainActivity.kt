@@ -47,6 +47,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -99,6 +101,26 @@ class MainActivity : ComponentActivity() {
                 
                 var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
                 var showInstallDialog by remember { mutableStateOf(false) }
+                var isDarkStatusBarIcons by remember { mutableStateOf(false) }
+
+                // TOP-LEVEL STATUS BAR MANAGEMENT
+                LaunchedEffect(isDarkStatusBarIcons) {
+                    val activity = context as? ComponentActivity ?: return@LaunchedEffect
+                    
+                    if (isDarkStatusBarIcons) {
+                        activity.enableEdgeToEdge(
+                            statusBarStyle = SystemBarStyle.light(
+                                android.graphics.Color.TRANSPARENT, 
+                                android.graphics.Color.TRANSPARENT
+                            )
+                        )
+                    } else {
+                        // For the splash screen / dark gradient background
+                        activity.enableEdgeToEdge(
+                            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                        )
+                    }
+                }
 
                 LaunchedEffect(Unit) {
                     val info = checkForUpdates(context)
@@ -137,7 +159,8 @@ class MainActivity : ComponentActivity() {
                         Box(modifier = Modifier.fillMaxSize()) {
                             CricketersTalesWebView(
                                 url = "https://cricketerstales.com/",
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxSize(),
+                                onStatusBarStyleChange = { isDarkStatusBarIcons = it }
                             )
 
                             updateInfo?.let { info ->
@@ -427,7 +450,18 @@ fun ModernBrandedLoader(isVisible: Boolean, isTransition: Boolean = false) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(if (isTransition) Color.Transparent else MaterialTheme.colorScheme.background),
+                .then(
+                    if (isTransition) Modifier.background(Color.Transparent)
+                    else Modifier.background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xFFFF4B2B),
+                                Color(0xFFD4145A),
+                                Color(0xFF8E2DE2)
+                            )
+                        )
+                    )
+                ),
             contentAlignment = if (isTransition) Alignment.TopCenter else Alignment.Center
         ) {
             val infiniteTransition = rememberInfiniteTransition(label = "branded_loader")
@@ -457,38 +491,36 @@ fun ModernBrandedLoader(isVisible: Boolean, isTransition: Boolean = false) {
                     .then(if (isTransition) Modifier.padding(top = 24.dp) else Modifier),
                 contentAlignment = Alignment.Center
             ) {
-                // High-End Glowing Ring
+                // Rotating Ring
                 Box(
                     modifier = Modifier
-                        .size(if (isTransition) 45.dp else 120.dp)
+                        .size(if (isTransition) 50.dp else 130.dp)
                         .rotate(rotation)
                         .background(
                             brush = Brush.sweepGradient(
                                 colors = listOf(
-                                    Color(0xFFFF4B2B).copy(alpha = 0.1f),
-                                    Color(0xFFD4145A),
-                                    Color(0xFF8E2DE2),
-                                    Color(0xFFFF4B2B).copy(alpha = 0.1f)
+                                    Color.White.copy(alpha = 0.1f),
+                                    Color.White,
+                                    Color.White.copy(alpha = 0.1f)
                                 )
                             ),
                             shape = CircleShape
                         )
                         .padding(if (isTransition) 2.dp else 4.dp)
                         .background(
-                            if (isTransition) Color.White.copy(alpha = 0.9f) else MaterialTheme.colorScheme.background,
+                            if (isTransition) Color.White.copy(alpha = 0.9f) else Color.Transparent,
                             shape = CircleShape
                         )
                 )
                 
-                // Enhanced Branded Core with Vector Logo
-                Box(
+                // Enhanced Branded Core with Vector Logo - Forced Circular
+                Surface(
                     modifier = Modifier
-                        .size(if (isTransition) 28.dp else 75.dp)
-                        .scale(pulse)
-                        .clip(CircleShape) // Enforce circular shape in loaders
-                        .background(Color.White)
-                        .padding(1.dp),
-                    contentAlignment = Alignment.Center
+                        .size(if (isTransition) 32.dp else 90.dp)
+                        .scale(pulse),
+                    shape = CircleShape,
+                    color = Color.White,
+                    tonalElevation = 8.dp
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.ic_launcher_foreground),
@@ -543,7 +575,8 @@ fun TermsAndConditionsDialog(onAccept: () -> Unit, onDecline: () -> Unit) {
 @Composable
 fun CricketersTalesWebView(
     url: String, 
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onStatusBarStyleChange: (Boolean) -> Unit
 ) {
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     var showSplashScreen by remember { mutableStateOf(true) }
@@ -552,30 +585,9 @@ fun CricketersTalesWebView(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    // Update Status Bar Style based on Splash Visibility
+    // Sync status bar style with splash visibility
     LaunchedEffect(showSplashScreen) {
-        val activity = context as? ComponentActivity ?: return@LaunchedEffect
-        val window = activity.window
-        val insetsController = WindowInsetsControllerCompat(window, window.decorView)
-        
-        if (showSplashScreen) {
-            // Splash has dark/gradient background, use light icons
-            activity.enableEdgeToEdge(
-                statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
-            )
-            insetsController.isAppearanceLightStatusBars = false
-            insetsController.isAppearanceLightNavigationBars = false
-        } else {
-            // Site has white background, use dark icons
-            activity.enableEdgeToEdge(
-                statusBarStyle = SystemBarStyle.light(
-                    android.graphics.Color.TRANSPARENT, 
-                    android.graphics.Color.TRANSPARENT
-                )
-            )
-            insetsController.isAppearanceLightStatusBars = true
-            insetsController.isAppearanceLightNavigationBars = true
-        }
+        onStatusBarStyleChange(!showSplashScreen)
     }
 
     BackHandler(enabled = true) {
@@ -586,7 +598,7 @@ fun CricketersTalesWebView(
         }
     }
 
-    Box(modifier = modifier.statusBarsPadding()) {
+    Box(modifier = modifier) {
         AndroidView(
             factory = { factoryContext ->
                 val swipeRefreshLayout = SwipeRefreshLayout(factoryContext)
@@ -628,7 +640,7 @@ fun CricketersTalesWebView(
                             swipeRefreshLayout.isRefreshing = false
                             errorCount = 0
                             
-                            // CHECK FOR CLOUDFLARE OR TIMEOUT ERRORS ON PAGE FINISH
+                            // CHECK FOR CLOUDFLARE ERRORS
                             view?.evaluateJavascript(
                                 "(function() { " +
                                 "   var text = document.body.innerText || ''; " +
@@ -640,7 +652,7 @@ fun CricketersTalesWebView(
                                 if (result == "true" && errorCount < 2) {
                                     errorCount++
                                     scope.launch {
-                                        delay(3000.milliseconds)
+                                        delay(2500.milliseconds)
                                         view.reload()
                                     }
                                 }
@@ -711,17 +723,16 @@ fun CricketersTalesWebView(
                     setOnRefreshListener {
                         webView.reload()
                     }
-                    // Fix: Correctly toggle pull-to-refresh based on scroll position
                     viewTreeObserver.addOnScrollChangedListener {
                         isEnabled = (webView.scrollY == 0)
                     }
                 }
                 swipeRefreshLayout
             },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize().statusBarsPadding()
         )
 
-        // Luxury Branded Loader
+        // Luxury Branded Loader (Full Screen Gradient for Splash)
         ModernBrandedLoader(isVisible = showSplashScreen)
         ModernBrandedLoader(isVisible = isNavigating && !isRefreshing, isTransition = true)
     }
