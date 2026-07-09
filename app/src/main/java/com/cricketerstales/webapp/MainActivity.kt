@@ -1,20 +1,23 @@
 package com.cricketerstales.webapp
 
 import android.annotation.SuppressLint
-import android.app.Activity
+import android.app.DownloadManager
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Bitmap
+import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
 import android.view.ViewGroup
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -56,6 +59,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -68,6 +72,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -75,23 +80,24 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import com.cricketerstales.webapp.data.PreferenceManager
 import com.cricketerstales.webapp.ui.theme.CricketerstalesTheme
-import com.google.android.play.core.appupdate.AppUpdateInfo
-import com.google.android.play.core.appupdate.AppUpdateManagerFactory
-import com.google.android.play.core.appupdate.AppUpdateOptions
-import com.google.android.play.core.install.InstallStateUpdatedListener
-import com.google.android.play.core.install.model.AppUpdateType
-import com.google.android.play.core.install.model.InstallStatus
-import com.google.android.play.core.install.model.UpdateAvailability
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 
 class MainActivity : ComponentActivity() {
+
+    private var downloadId: Long = -1L
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // Enabling Edge-to-Edge to allow content to flow behind system bars
         enableEdgeToEdge()
         
         setContent {
@@ -103,67 +109,53 @@ class MainActivity : ComponentActivity() {
                 val snackbarHostState = remember { SnackbarHostState() }
                 
                 var showExitDialog by remember { mutableStateOf(false) }
-                var showUpdateDialog by remember { mutableStateOf<AppUpdateInfo?>(null) }
+                var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
 
-                // In-App Update Logic
-                val appUpdateManager = remember { AppUpdateManagerFactory.create(context) }
-                val updateLauncher = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.StartIntentSenderForResult()
-                ) { result ->
-                    if (result.resultCode != Activity.RESULT_OK) {
-                        // Handle update failure/cancellation
+                // Check for updates from GitHub API
+                LaunchedEffect(Unit) {
+                    val info = checkForUpdates(context)
+                    if (info != null) {
+                        updateInfo = info
                     }
                 }
 
-                LaunchedEffect(Unit) {
-                    val appUpdateInfoTask = appUpdateManager.appUpdateInfo
-                    appUpdateInfoTask.addOnSuccessListener { appUpdateInfo ->
-                        if (appUpdateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                            && appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)
-                        ) {
-                            showUpdateDialog = appUpdateInfo
-                        }
-                    }
-
-                    val listener = InstallStateUpdatedListener { state ->
-                        if (state.installStatus() == InstallStatus.DOWNLOADED) {
-                            scope.launch {
-                                val result = snackbarHostState.showSnackbar(
-                                    message = "Update ready to install!",
-                                    actionLabel = "RESTART",
-                                    duration = SnackbarDuration.Indefinite
-                                )
-                                if (result == SnackbarResult.ActionPerformed) {
-                                    appUpdateManager.completeUpdate()
+                // Register Download Complete Listener
+                DisposableEffect(Unit) {
+                    val onDownloadComplete = object : BroadcastReceiver() {
+                        override fun onReceive(context: Context, intent: Intent) {
+                            val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
+                            if (id == downloadId) {
+                                scope.launch {
+                                    val result = snackbarHostState.showSnackbar(
+                                        message = "Download complete!",
+                                        actionLabel = "INSTALL",
+                                        duration = SnackbarDuration.Indefinite
+                                    )
+                                    if (result == SnackbarResult.ActionPerformed) {
+                                        installApk(context)
+                                    }
                                 }
                             }
                         }
                     }
-                    appUpdateManager.registerListener(listener)
+                    context.registerReceiver(onDownloadComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), RECEIVER_EXPORTED)
+                    onDispose { context.unregisterReceiver(onDownloadComplete) }
                 }
 
                 when (isTermsAccepted) {
                     null -> { /* Loading */ }
                     false -> {
                         TermsAndConditionsDialog(
-                            onAccept = {
-                                scope.launch {
-                                    preferenceManager.setTermsAccepted(true)
-                                }
-                            },
-                            onDecline = {
-                                finish()
-                            }
+                            onAccept = { scope.launch { preferenceManager.setTermsAccepted(true) } },
+                            onDecline = { finish() }
                         )
                     }
                     true -> {
                         Scaffold(
                             modifier = Modifier.fillMaxSize(),
                             snackbarHost = { SnackbarHost(snackbarHostState) },
-                            // Remove all default insets from Scaffold to allow true full-screen
                             contentWindowInsets = WindowInsets(0, 0, 0, 0)
                         ) { _ ->
-                            // Ignore the innerPadding to allow WebView to occupy the entire screen
                             CricketersTalesWebView(
                                 url = "https://cricketerstales.com/",
                                 modifier = Modifier.fillMaxSize(),
@@ -178,17 +170,13 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        showUpdateDialog?.let { info ->
+                        updateInfo?.let { info ->
                             CustomUpdateDialog(
                                 onUpdate = {
-                                    showUpdateDialog = null
-                                    appUpdateManager.startUpdateFlowForResult(
-                                        info,
-                                        updateLauncher,
-                                        AppUpdateOptions.newBuilder(AppUpdateType.FLEXIBLE).build()
-                                    )
+                                    updateInfo = null
+                                    downloadId = downloadAndInstallApk(context, info.downloadUrl)
                                 },
-                                onDismiss = { showUpdateDialog = null }
+                                onDismiss = { updateInfo = null }
                             )
                         }
                     }
@@ -196,7 +184,62 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    private suspend fun checkForUpdates(context: Context): UpdateInfo? = withContext(Dispatchers.IO) {
+        try {
+            val url = URL("https://api.github.com/repos/nikhil2001gowda/Cricketerstales/releases/latest")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.connect()
+            
+            if (connection.responseCode == 200) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val json = JSONObject(response)
+                val tagName = json.getString("tag_name") // e.g., "v1.0.1"
+                val currentVersion = context.packageManager.getPackageInfo(context.packageName, 0).versionName
+                
+                // Compare versions (simple string comparison for "v1.0.1")
+                if (tagName != "v$currentVersion") {
+                    val assets = json.getJSONArray("assets")
+                    if (assets.length() > 0) {
+                        val apkUrl = assets.getJSONObject(0).getString("browser_download_url")
+                        return@withContext UpdateInfo(tagName, apkUrl)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        null
+    }
+
+    private fun downloadAndInstallApk(context: Context, url: String): Long {
+        val request = DownloadManager.Request(Uri.parse(url))
+            .setTitle("CricketersTales Update")
+            .setDescription("Downloading new version...")
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, "update.apk")
+            .setAllowedOverMetered(true)
+            .setAllowedOverRoaming(true)
+
+        val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        return dm.enqueue(request)
+    }
+
+    private fun installApk(context: Context) {
+        val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "update.apk")
+        if (file.exists()) {
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+            }
+            context.startActivity(intent)
+        }
+    }
 }
+
+data class UpdateInfo(val version: String, val downloadUrl: String)
 
 @Composable
 fun CustomUpdateDialog(onUpdate: () -> Unit, onDismiss: () -> Unit) {
@@ -483,7 +526,7 @@ fun CricketersTalesWebView(
                 progress = { progress },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 32.dp) // Provide some spacing for the status bar area
+                    .padding(top = 32.dp)
             )
         }
 
