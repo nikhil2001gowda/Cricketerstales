@@ -82,7 +82,6 @@ class MainActivity : ComponentActivity() {
                 val preferenceManager = remember { PreferenceManager(context) }
                 val isTermsAccepted by preferenceManager.isTermsAccepted.collectAsState(initial = null)
                 val scope = rememberCoroutineScope()
-                val snackbarHostState = remember { SnackbarHostState() }
                 
                 var showExitDialog by remember { mutableStateOf(false) }
                 var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
@@ -99,15 +98,17 @@ class MainActivity : ComponentActivity() {
                     val onDownloadComplete = object : BroadcastReceiver() {
                         override fun onReceive(context: Context, intent: Intent) {
                             val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
-                            if (id == downloadId) {
+                            if (id == downloadId && id != -1L) {
+                                // Trigger the modern UI dialog instead of showing a snackbar/toast
                                 showInstallDialog = true
                             }
                         }
                     }
+                    val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        context.registerReceiver(onDownloadComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), RECEIVER_NOT_EXPORTED)
+                        context.registerReceiver(onDownloadComplete, filter, RECEIVER_NOT_EXPORTED)
                     } else {
-                        context.registerReceiver(onDownloadComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+                        context.registerReceiver(onDownloadComplete, filter)
                     }
                     onDispose { context.unregisterReceiver(onDownloadComplete) }
                 }
@@ -121,43 +122,39 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     true -> {
-                        Scaffold(
-                            modifier = Modifier.fillMaxSize(),
-                            snackbarHost = { SnackbarHost(snackbarHostState) },
-                            contentWindowInsets = WindowInsets(0, 0, 0, 0)
-                        ) { _ ->
+                        Box(modifier = Modifier.fillMaxSize()) {
                             CricketersTalesWebView(
                                 url = "https://cricketerstales.com/",
                                 modifier = Modifier.fillMaxSize(),
                                 onShowExitDialog = { showExitDialog = true }
                             )
-                        }
 
-                        if (showExitDialog) {
-                            ExitConfirmationDialog(
-                                onConfirm = { finish() },
-                                onDismiss = { showExitDialog = false }
-                            )
-                        }
+                            if (showExitDialog) {
+                                ExitConfirmationDialog(
+                                    onConfirm = { finish() },
+                                    onDismiss = { showExitDialog = false }
+                                )
+                            }
 
-                        updateInfo?.let { info ->
-                            CustomUpdateDialog(
-                                onUpdate = {
-                                    updateInfo = null
-                                    downloadId = downloadAndInstallApk(context, info.downloadUrl)
-                                },
-                                onDismiss = { updateInfo = null }
-                            )
-                        }
+                            updateInfo?.let { info ->
+                                CustomUpdateDialog(
+                                    onUpdate = {
+                                        updateInfo = null
+                                        downloadId = downloadAndInstallApk(context, info.downloadUrl)
+                                    },
+                                    onDismiss = { updateInfo = null }
+                                )
+                            }
 
-                        if (showInstallDialog) {
-                            InstallReadyDialog(
-                                onInstall = {
-                                    showInstallDialog = false
-                                    checkInstallPermissionAndInstall(context)
-                                },
-                                onDismiss = { showInstallDialog = false }
-                            )
+                            if (showInstallDialog) {
+                                InstallReadyDialog(
+                                    onInstall = {
+                                        showInstallDialog = false
+                                        checkInstallPermissionAndInstall(context)
+                                    },
+                                    onDismiss = { showInstallDialog = false }
+                                )
+                            }
                         }
                     }
                 }
@@ -208,19 +205,25 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun downloadAndInstallApk(context: Context, url: String): Long {
-        val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "update.apk")
-        if (file.exists()) file.delete()
+        try {
+            // Clear previous download if exists
+            val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "update.apk")
+            if (file.exists()) file.delete()
 
-        val request = DownloadManager.Request(Uri.parse(url))
-            .setTitle("CricketersTales Update")
-            .setDescription("Downloading new version...")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, "update.apk")
-            .setAllowedOverMetered(true)
-            .setAllowedOverRoaming(true)
+            val request = DownloadManager.Request(Uri.parse(url))
+                .setTitle("CricketersTales Update")
+                .setDescription("Downloading new version...")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, "update.apk")
+                .setAllowedOverMetered(true)
+                .setAllowedOverRoaming(true)
 
-        val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        return dm.enqueue(request)
+            val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            return dm.enqueue(request)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return -1L
+        }
     }
 
     private fun checkInstallPermissionAndInstall(context: Context) {
@@ -238,19 +241,19 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun installApk(context: Context) {
-        val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "update.apk")
-        if (file.exists()) {
-            val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/vnd.android.package-archive")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            try {
+        try {
+            val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "update.apk")
+            if (file.exists()) {
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, "application/vnd.android.package-archive")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
                 context.startActivity(intent)
-            } catch (e: Exception) {
-                e.printStackTrace()
             }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 }
@@ -294,7 +297,7 @@ fun InstallReadyDialog(onInstall: () -> Unit, onDismiss: () -> Unit) {
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Text(
-                    text = "Download Complete!",
+                    text = "Ready to Install!",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -303,7 +306,7 @@ fun InstallReadyDialog(onInstall: () -> Unit, onDismiss: () -> Unit) {
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "The update has been downloaded successfully. Click install to update your app to the latest version.",
+                    text = "The latest version of CricketersTales has been downloaded. Click install to update now.",
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -316,7 +319,7 @@ fun InstallReadyDialog(onInstall: () -> Unit, onDismiss: () -> Unit) {
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = onDismiss) {
-                        Text("Cancel", color = MaterialTheme.colorScheme.secondary)
+                        Text("Later", color = MaterialTheme.colorScheme.secondary)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
@@ -451,7 +454,6 @@ fun ModernLoader(isVisible: Boolean, isTransition: Boolean = false) {
                     .then(if (isTransition) Modifier.padding(top = 24.dp) else Modifier),
                 contentAlignment = Alignment.Center
             ) {
-                // Rotating Ring
                 Box(
                     modifier = Modifier
                         .size(if (isTransition) 45.dp else 100.dp)
@@ -473,7 +475,6 @@ fun ModernLoader(isVisible: Boolean, isTransition: Boolean = false) {
                         )
                 )
                 
-                // Branded Core
                 Box(
                     modifier = Modifier
                         .size(if (isTransition) 28.dp else 60.dp)
@@ -635,7 +636,7 @@ fun CricketersTalesWebView(
                     
                     webChromeClient = object : android.webkit.WebChromeClient() {
                         override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                            if (newProgress > 50) {
+                            if (newProgress > 45) {
                                 showSplashScreen = false
                                 isNavigating = false
                                 swipeRefreshLayout.isRefreshing = false
@@ -652,8 +653,6 @@ fun CricketersTalesWebView(
                     setOnRefreshListener {
                         webView.reload()
                     }
-                    // Crucial: Only enable pull-to-refresh when at the very top of the site
-                    // We use the View's scroll position for consistency
                     viewTreeObserver.addOnScrollChangedListener {
                         isEnabled = (webView.scrollY == 0)
                     }
@@ -663,10 +662,7 @@ fun CricketersTalesWebView(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Initial Splash
         ModernLoader(isVisible = showSplashScreen)
-        
-        // Branded Top-Center Transition Loader
         ModernLoader(isVisible = isNavigating, isTransition = true)
     }
 }
