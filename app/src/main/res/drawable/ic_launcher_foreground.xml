@@ -5,7 +5,7 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Luxury Gradient Background (Inspired by Newflix style) -->
+    <!-- Premium Linear Gradient Background -->
     <path android:pathData="M0,0h108v108h-108z">
         <aapt:attr name="android:fillColor">
             <gradient
@@ -21,20 +21,17 @@
         </aapt:attr>
     </path>
 
-    <!-- Modern Minimalist Rounded "CT" -->
+    <!-- Stylized Modern Interlocking "CT"
+         Based on user provided drawing: Rounded corners and touching/flowing design -->
     <group
-        android:translateX="8"
-        android:translateY="8">
+        android:translateX="4"
+        android:translateY="4">
 
-        <!-- Stylized C (Smooth Rounded Arc) -->
+        <!-- Interlocking CT Flow Path -->
+        <!-- This path combines C and T into a single modern silhouette -->
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M45,30 L32,30 C25.4,30 20,35.4 20,42 L20,54 C20,60.6 25.4,66 32,66 L45,66 L45,56 L32,56 C30.9,56 30,54.1 30,53 L30,43 C30,41.9 30.9,40 32,40 L45,40 Z" />
-
-        <!-- Stylized T (Modern Rounded Column) -->
-        <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M80,30 L55,30 L55,40 L63,40 L63,66 L73,66 L72,40 L80,40 Z" />
+            android:pathData="M48,32 L34,32 C26,32 20,38 20,46 L20,58 C20,66 26,72 34,72 L48,72 L48,60 L36,60 C33,60 32,58 32,56 L32,48 C32,46 33,44 36,44 L48,44 L48,32 Z M50,32 L84,32 L84,44 L73,44 L73,72 L61,72 L61,44 L50,44 L50,32 Z" />
 
     </group>
 

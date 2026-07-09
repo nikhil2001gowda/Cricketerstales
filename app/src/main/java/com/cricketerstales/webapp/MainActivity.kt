@@ -1,6 +1,7 @@
 package com.cricketerstales.webapp
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.app.DownloadManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -21,6 +22,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -45,8 +47,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,6 +55,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -66,6 +67,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.cricketerstales.webapp.data.PreferenceManager
 import com.cricketerstales.webapp.ui.theme.CricketerstalesTheme
@@ -451,13 +453,13 @@ fun ModernBrandedLoader(isVisible: Boolean, isTransition: Boolean = false) {
 
             Box(
                 modifier = Modifier
-                    .then(if (isTransition) Modifier.padding(top = 16.dp) else Modifier),
+                    .then(if (isTransition) Modifier.padding(top = 24.dp) else Modifier),
                 contentAlignment = Alignment.Center
             ) {
-                // High-End Rotating Gradient Ring
+                // High-End Glowing Ring
                 Box(
                     modifier = Modifier
-                        .size(if (isTransition) 50.dp else 120.dp)
+                        .size(if (isTransition) 45.dp else 120.dp)
                         .rotate(rotation)
                         .background(
                             brush = Brush.sweepGradient(
@@ -535,7 +537,6 @@ fun TermsAndConditionsDialog(onAccept: () -> Unit, onDecline: () -> Unit) {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun CricketersTalesWebView(
@@ -546,133 +547,157 @@ fun CricketersTalesWebView(
     var showSplashScreen by remember { mutableStateOf(true) }
     var isNavigating by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
-    val pullToRefreshState = rememberPullToRefreshState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+
+    // Update Status Bar Style based on Splash Visibility
+    LaunchedEffect(showSplashScreen) {
+        val activity = context as? Activity ?: return@LaunchedEffect
+        val window = activity.window
+        val insetsController = WindowInsetsControllerCompat(window, window.decorView)
+        
+        if (showSplashScreen) {
+            // Splash has dark/gradient background, use light icons
+            activity.enableEdgeToEdge(
+                statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+            )
+            insetsController.isAppearanceLightStatusBars = false
+        } else {
+            // Site has white background, use dark icons
+            activity.enableEdgeToEdge(
+                statusBarStyle = SystemBarStyle.light(
+                    android.graphics.Color.TRANSPARENT, 
+                    android.graphics.Color.TRANSPARENT
+                )
+            )
+            insetsController.isAppearanceLightStatusBars = true
+        }
+    }
 
     BackHandler(enabled = true) {
         if (webViewInstance?.canGoBack() == true) {
             webViewInstance?.goBack()
         } else {
-            (context as? android.app.Activity)?.finish()
+            (context as? Activity)?.finish()
         }
     }
 
     Box(modifier = modifier.statusBarsPadding()) {
-        PullToRefreshBox(
-            isRefreshing = isRefreshing,
-            state = pullToRefreshState,
-            onRefresh = {
-                isRefreshing = true
-                webViewInstance?.reload()
+        AndroidView(
+            factory = { factoryContext ->
+                val swipeRefreshLayout = SwipeRefreshLayout(factoryContext)
+                val webView = WebView(factoryContext).apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    
+                    settings.apply {
+                        javaScriptEnabled = true
+                        domStorageEnabled = true
+                        databaseEnabled = true
+                        cacheMode = WebSettings.LOAD_DEFAULT 
+                        loadWithOverviewMode = true
+                        useWideViewPort = true
+                        setSupportZoom(true)
+                        builtInZoomControls = true
+                        displayZoomControls = false
+                        offscreenPreRaster = true
+                        layoutAlgorithm = WebSettings.LayoutAlgorithm.TEXT_AUTOSIZING
+                        mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+                    }
+
+                    webViewClient = object : WebViewClient() {
+                        private var errorCount = 0
+
+                        override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                            super.onPageStarted(view, url, favicon)
+                            if (!showSplashScreen && !swipeRefreshLayout.isRefreshing) {
+                                isNavigating = true
+                            }
+                        }
+
+                        override fun onPageFinished(view: WebView?, url: String?) {
+                            super.onPageFinished(view, url)
+                            isNavigating = false
+                            showSplashScreen = false
+                            swipeRefreshLayout.isRefreshing = false
+                            errorCount = 0
+                        }
+
+                        override fun onPageCommitVisible(view: WebView?, url: String?) {
+                            super.onPageCommitVisible(view, view?.url)
+                            showSplashScreen = false
+                            isNavigating = false
+                            swipeRefreshLayout.isRefreshing = false
+                        }
+
+                        override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
+                            if (request?.isForMainFrame == true && errorCount < 2) {
+                                errorCount++
+                                scope.launch {
+                                    delay(1500.milliseconds)
+                                    view?.reload()
+                                }
+                            }
+                            super.onReceivedError(view, request, error)
+                        }
+
+                        override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
+                            if (errorCount < 1) {
+                                errorCount++
+                                handler?.cancel()
+                                scope.launch {
+                                    delay(1000.milliseconds)
+                                    view?.reload()
+                                }
+                            } else {
+                                super.onReceivedSslError(view, handler, error)
+                            }
+                        }
+
+                        override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                            val requestUrl = request?.url?.toString() ?: return false
+                            return if (requestUrl.contains("cricketerstales.com")) {
+                                false 
+                            } else {
+                                try {
+                                    val intent = Intent(Intent.ACTION_VIEW, requestUrl.toUri())
+                                    context.startActivity(intent)
+                                } catch (_: Exception) { }
+                                true
+                            }
+                        }
+                    }
+                    
+                    webChromeClient = object : android.webkit.WebChromeClient() {
+                        override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                            if (newProgress > 40) {
+                                showSplashScreen = false
+                                isNavigating = false
+                                swipeRefreshLayout.isRefreshing = false
+                            }
+                        }
+                    }
+
+                    loadUrl(url)
+                    webViewInstance = this
+                }
+
+                swipeRefreshLayout.apply {
+                    addView(webView)
+                    setOnRefreshListener {
+                        webView.reload()
+                    }
+                    // Fix: Correctly toggle pull-to-refresh based on scroll position
+                    viewTreeObserver.addOnScrollChangedListener {
+                        isEnabled = (webView.scrollY == 0)
+                    }
+                }
+                swipeRefreshLayout
             },
             modifier = Modifier.fillMaxSize()
-        ) {
-            AndroidView(
-                factory = { context ->
-                    val webView = WebView(context).apply {
-                        layoutParams = ViewGroup.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT
-                        )
-                        
-                        settings.apply {
-                            javaScriptEnabled = true
-                            domStorageEnabled = true
-                            databaseEnabled = true
-                            cacheMode = WebSettings.LOAD_DEFAULT 
-                            loadWithOverviewMode = true
-                            useWideViewPort = true
-                            setSupportZoom(true)
-                            builtInZoomControls = true
-                            displayZoomControls = false
-                            offscreenPreRaster = true
-                            layoutAlgorithm = WebSettings.LayoutAlgorithm.TEXT_AUTOSIZING
-                            mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-                        }
-
-                        webViewClient = object : WebViewClient() {
-                            private var errorCount = 0
-
-                            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                                super.onPageStarted(view, url, favicon)
-                                if (!showSplashScreen && !isRefreshing) {
-                                    isNavigating = true
-                                }
-                            }
-
-                            override fun onPageFinished(view: WebView?, url: String?) {
-                                super.onPageFinished(view, url)
-                                isNavigating = false
-                                showSplashScreen = false
-                                isRefreshing = false
-                                errorCount = 0
-                            }
-
-                            override fun onPageCommitVisible(view: WebView?, url: String?) {
-                                super.onPageCommitVisible(view, view?.url)
-                                showSplashScreen = false
-                                isNavigating = false
-                                isRefreshing = false
-                            }
-
-                            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
-                                if (request?.isForMainFrame == true && errorCount < 2) {
-                                    errorCount++
-                                    scope.launch {
-                                        delay(1500.milliseconds)
-                                        view?.reload()
-                                    }
-                                }
-                                super.onReceivedError(view, request, error)
-                            }
-
-                            override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
-                                if (errorCount < 1) {
-                                    errorCount++
-                                    handler?.cancel()
-                                    scope.launch {
-                                        delay(1000.milliseconds)
-                                        view?.reload()
-                                    }
-                                } else {
-                                    super.onReceivedSslError(view, handler, error)
-                                }
-                            }
-
-                            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                                val requestUrl = request?.url?.toString() ?: return false
-                                return if (requestUrl.contains("cricketerstales.com")) {
-                                    false 
-                                    // Removed isNavigating trigger here to ensure instant responsiveness on click
-                                } else {
-                                    try {
-                                        val intent = Intent(Intent.ACTION_VIEW, requestUrl.toUri())
-                                        context.startActivity(intent)
-                                    } catch (_: Exception) { }
-                                    true
-                                }
-                            }
-                        }
-                        
-                        webChromeClient = object : android.webkit.WebChromeClient() {
-                            override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                                if (newProgress > 40) {
-                                    showSplashScreen = false
-                                    isNavigating = false
-                                    isRefreshing = false
-                                }
-                            }
-                        }
-
-                        loadUrl(url)
-                        webViewInstance = this
-                    }
-                    webView
-                },
-                modifier = Modifier.fillMaxSize()
-            )
-        }
+        )
 
         // Luxury Branded Loader
         ModernBrandedLoader(isVisible = showSplashScreen)
