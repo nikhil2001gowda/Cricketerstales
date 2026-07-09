@@ -623,6 +623,24 @@ fun CricketersTalesWebView(
                             showSplashScreen = false
                             swipeRefreshLayout.isRefreshing = false
                             errorCount = 0
+                            
+                            // CHECK FOR CLOUDFLARE OR TIMEOUT ERRORS ON PAGE FINISH
+                            view?.evaluateJavascript(
+                                "(function() { " +
+                                "   var text = document.body.innerText || ''; " +
+                                "   return (text.includes('Connection timed out') || " +
+                                "           text.includes('Error code 522') || " +
+                                "           text.includes('Cloudflare') && text.includes('Error')); " +
+                                "})()"
+                            ) { result ->
+                                if (result == "true" && errorCount < 2) {
+                                    errorCount++
+                                    scope.launch {
+                                        delay(3000.milliseconds)
+                                        view.reload()
+                                    }
+                                }
+                            }
                         }
 
                         override fun onPageCommitVisible(view: WebView?, url: String?) {
