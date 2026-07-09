@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -350,7 +351,7 @@ fun AdvancedLoadingScreen(isVisible: Boolean, isTransition: Boolean = false) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(if (isTransition) Color.Black.copy(alpha = 0.3f) else MaterialTheme.colorScheme.background),
+                .background(if (isTransition) Color.Black.copy(alpha = 0.5f) else MaterialTheme.colorScheme.background),
             contentAlignment = Alignment.Center
         ) {
             val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -369,11 +370,18 @@ fun AdvancedLoadingScreen(isVisible: Boolean, isTransition: Boolean = false) {
                 verticalArrangement = Arrangement.Center
             ) {
                 if (isTransition) {
-                    // Small spinning indicator for page transitions
-                    LinearProgressIndicator(
-                        modifier = Modifier.width(150.dp),
+                    // Circular indicator for page transitions
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(64.dp),
                         color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        strokeWidth = 4.dp
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Loading...",
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold
                     )
                 } else {
                     // Full splash pulse
@@ -559,7 +567,7 @@ fun CricketersTalesWebView(
         // Full-screen Initial Splash
         AdvancedLoadingScreen(isVisible = showSplashScreen)
 
-        // Smooth Overlay Transition for internal clicks
+        // Smooth Overlay Transition with Circular Loader for internal clicks
         AdvancedLoadingScreen(isVisible = isNavigating, isTransition = true)
     }
 }
