@@ -623,6 +623,18 @@ fun CricketersTalesWebView(
                         mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
                     }
 
+                    // ADD JAVASCRIPT INTERFACE FOR INSTANT CLICK FEEDBACK
+                    addJavascriptInterface(object {
+                        @android.webkit.JavascriptInterface
+                        fun onLinkClick() {
+                            scope.launch(Dispatchers.Main) {
+                                if (!showSplashScreen && !swipeRefreshLayout.isRefreshing) {
+                                    isNavigating = true
+                                }
+                            }
+                        }
+                    }, "AndroidInterface")
+
                     webViewClient = object : WebViewClient() {
                         private var errorCount = 0
 
@@ -639,6 +651,23 @@ fun CricketersTalesWebView(
                             showSplashScreen = false
                             swipeRefreshLayout.isRefreshing = false
                             errorCount = 0
+
+                            // INJECT SCRIPT TO DETECT CLICKS ON LINKS
+                            view?.evaluateJavascript(
+                                """
+                                (function() {
+                                    document.addEventListener('click', function(e) {
+                                        var target = e.target;
+                                        while (target && target.tagName !== 'A') {
+                                            target = target.parentNode;
+                                        }
+                                        if (target && target.tagName === 'A' && target.href && !target.href.startsWith('javascript:')) {
+                                            AndroidInterface.onLinkClick();
+                                        }
+                                    }, true);
+                                })();
+                                """.trimIndent(), null
+                            )
                             
                             // CHECK FOR CLOUDFLARE ERRORS
                             view?.evaluateJavascript(
