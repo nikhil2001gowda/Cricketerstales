@@ -202,10 +202,10 @@ class MainActivity : ComponentActivity() {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
                 val json = JSONObject(response)
                 val tagName = json.getString("tag_name") // e.g., "v1.0.1"
-                val currentVersion = context.packageManager.getPackageInfo(context.packageName, 0).versionName
+                val latestVersion = tagName.removePrefix("v").trim()
+                val currentVersion = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.0.0"
                 
-                // Compare versions (simple string comparison for "v1.0.1")
-                if (tagName != "v$currentVersion") {
+                if (isNewerVersion(currentVersion, latestVersion)) {
                     val assets = json.getJSONArray("assets")
                     if (assets.length() > 0) {
                         val apkUrl = assets.getJSONObject(0).getString("browser_download_url")
@@ -217,6 +217,20 @@ class MainActivity : ComponentActivity() {
             e.printStackTrace()
         }
         null
+    }
+
+    private fun isNewerVersion(current: String, latest: String): Boolean {
+        val currentParts = current.split(".").mapNotNull { it.toIntOrNull() }
+        val latestParts = latest.split(".").mapNotNull { it.toIntOrNull() }
+        
+        val maxLength = maxOf(currentParts.size, latestParts.size)
+        for (i in 0 until maxLength) {
+            val curr = currentParts.getOrElse(i) { 0 }
+            val lat = latestParts.getOrElse(i) { 0 }
+            if (lat > curr) return true
+            if (curr > lat) return false
+        }
+        return false
     }
 
     private fun downloadAndInstallApk(context: Context, url: String): Long {
