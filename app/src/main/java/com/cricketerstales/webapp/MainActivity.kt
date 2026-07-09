@@ -84,6 +84,7 @@ class MainActivity : ComponentActivity() {
     private var downloadId: Long = -1L
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Immediate launch, no delay
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         
@@ -460,13 +461,13 @@ fun ModernBrandedLoader(isVisible: Boolean, isTransition: Boolean = false) {
 
             Box(
                 modifier = Modifier
-                    .then(if (isTransition) Modifier.padding(top = 24.dp) else Modifier),
+                    .then(if (isTransition) Modifier.padding(top = 16.dp) else Modifier),
                 contentAlignment = Alignment.Center
             ) {
-                // High-End Glowing Ring
+                // Rotating Ring
                 Box(
                     modifier = Modifier
-                        .size(if (isTransition) 45.dp else 110.dp)
+                        .size(if (isTransition) 45.dp else 120.dp)
                         .rotate(rotation)
                         .background(
                             brush = Brush.sweepGradient(
@@ -480,12 +481,12 @@ fun ModernBrandedLoader(isVisible: Boolean, isTransition: Boolean = false) {
                         )
                         .padding(if (isTransition) 2.dp else 4.dp)
                         .background(
-                            if (isTransition) Color.White.copy(alpha = 0.9f) else MaterialTheme.colorScheme.background,
+                            if (isTransition) Color.White.copy(alpha = 0.8f) else MaterialTheme.colorScheme.background,
                             shape = CircleShape
                         )
                 )
                 
-                // Branded Core
+                // Pulsing Branded Core
                 Box(
                     modifier = Modifier
                         .size(if (isTransition) 28.dp else 75.dp)
@@ -607,20 +608,24 @@ fun CricketersTalesWebView(
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
                         
+                        // MAXIMUM PERFORMANCE TUNING
                         settings.apply {
                             javaScriptEnabled = true
                             domStorageEnabled = true
                             databaseEnabled = true
                             cacheMode = WebSettings.LOAD_DEFAULT 
+                            
+                            // Speed optimizations
                             loadWithOverviewMode = true
                             useWideViewPort = true
                             setSupportZoom(true)
                             builtInZoomControls = true
                             displayZoomControls = false
                             
-                            // Speed optimizations
+                            // Advanced rendering tweaks
                             offscreenPreRaster = true
                             layoutAlgorithm = WebSettings.LayoutAlgorithm.TEXT_AUTOSIZING
+                            mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
                         }
 
                         webViewClient = object : WebViewClient() {
@@ -648,11 +653,12 @@ fun CricketersTalesWebView(
                                 isRefreshing = false
                             }
 
+                            // AUTO-HEALING: Refresh on Errors
                             override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
-                                if (request?.isForMainFrame == true && errorCount < 3) {
+                                if (request?.isForMainFrame == true && errorCount < 2) {
                                     errorCount++
                                     scope.launch {
-                                        delay(2000.milliseconds)
+                                        delay(1500.milliseconds)
                                         view?.reload()
                                     }
                                 }
@@ -660,7 +666,8 @@ fun CricketersTalesWebView(
                             }
 
                             override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
-                                if (errorCount < 2) {
+                                // Auto-retry on SSL transient errors
+                                if (errorCount < 1) {
                                     errorCount++
                                     handler?.cancel()
                                     scope.launch {
@@ -672,10 +679,7 @@ fun CricketersTalesWebView(
                                 }
                             }
 
-                            override fun shouldOverrideUrlLoading(
-                                view: WebView?,
-                                request: WebResourceRequest?
-                            ): Boolean {
+                            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                                 val requestUrl = request?.url?.toString() ?: return false
                                 return if (requestUrl.contains("cricketerstales.com")) {
                                     false 
@@ -691,7 +695,8 @@ fun CricketersTalesWebView(
                         
                         webChromeClient = object : android.webkit.WebChromeClient() {
                             override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                                if (newProgress > 45) {
+                                // Super aggressive hide for instant feel
+                                if (newProgress > 40) {
                                     showSplashScreen = false
                                     isNavigating = false
                                     isRefreshing = false
@@ -708,10 +713,8 @@ fun CricketersTalesWebView(
             )
         }
 
-        // Modern Initial Splash
+        // Luxury Branded Loader
         ModernBrandedLoader(isVisible = showSplashScreen)
-        
-        // Branded Top-Center Transition Loader
         ModernBrandedLoader(isVisible = isNavigating && !isRefreshing, isTransition = true)
     }
 }

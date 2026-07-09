@@ -2,9 +2,14 @@ package com.cricketerstales.webapp.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val LogoRed = Color(0xFFE53935)
-val LogoRedLight = Color(0xFFFF6F60)
-val LogoRedDark = Color(0xFFAB000D)
+// Modern Vibrant Palette
+val ModernCrimson = Color(0xFFFF0000)
+val ModernViolet = Color(0xFF8E2DE2)
+val AccentPink = Color(0xFFFF00CC)
+val AccentDeepBlue = Color(0xFF333399)
+
+val DarkSurface = Color(0xFF121212)
+val LightSurface = Color(0xFFF5F5F5)
 
 val Purple80 = Color(0xFFD0BCFF)
 val PurpleGrey80 = Color(0xFFCCC2DC)

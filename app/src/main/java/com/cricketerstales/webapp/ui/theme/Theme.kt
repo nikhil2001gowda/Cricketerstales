@@ -9,24 +9,33 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = LogoRed,
-    secondary = PurpleGrey80,
-    tertiary = LogoRedLight
+    primary = ModernCrimson,
+    secondary = ModernViolet,
+    tertiary = AccentPink,
+    background = DarkSurface,
+    surface = DarkSurface,
+    onPrimary = Color.White,
+    onSecondary = Color.White
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = LogoRed,
-    secondary = PurpleGrey40,
-    tertiary = LogoRedDark
+    primary = ModernCrimson,
+    secondary = ModernViolet,
+    tertiary = AccentDeepBlue,
+    background = LightSurface,
+    surface = Color.White,
+    onPrimary = Color.White,
+    onSecondary = Color.White
 )
 
 @Composable
 fun CricketerstalesTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Disable dynamic color to maintain branded red theme
+    // Maintain brand identity
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {

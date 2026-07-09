@@ -1,31 +1,60 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Bold Branded Red Circle (#FF0000) -->
+    <!-- Modern Gradient Background (Inspired by the provided image) -->
+    <path android:pathData="M54,54m-48,0a48,48 0,1 1,96 0a48,48 0,1 1,-96 0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="54"
+                android:centerY="54"
+                android:gradientRadius="48"
+                android:type="radial">
+                <item android:color="#FF4B2B" android:offset="0" />
+                <item android:color="#FF0000" android:offset="0.5" />
+                <item android:color="#8E2DE2" android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Stylized Modern "CT" -->
+    <!-- Left Pill (Forming 'C' backbone) -->
     <path
-        android:fillColor="#FF0000"
-        android:pathData="M54,54m-45,0a45,45 0,1 1,90 0a45,45 0,1 1,-90 0" />
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,35 L42,35 A5,5 0,0 1 47,40 L47,68 A5,5 0,0 1 42,73 L32,73 A5,5 0,0 1 27,68 L27,40 A5,5 0,0 1 32,35 Z" />
 
-    <!-- Enhanced High-Definition "Sporty CT" Typography
-         Bold, Italicized, and Slanted for a professional sports feel -->
+    <!-- Right Pill (Forming 'T' backbone) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M66,35 L76,35 A5,5 0,0 1 81,40 L81,68 A5,5 0,0 1 76,73 L66,73 A5,5 0,0 1 61,68 L61,40 A5,5 0,0 1 66,35 Z" />
 
-    <group
-        android:translateX="1"
-        android:translateY="2">
+    <!-- 'T' Top Bar -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,35 L81,35 A3,3 0,0 1 84,38 L84,42 A3,3 0,0 1 81,45 L54,45 Z" />
 
-        <!-- Letter C (Sporty Block Italic) -->
-        <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M48,40 L34,40 L28,68 L46,68 L47,60 L35,60 L37,48 L46,48 Z" />
+    <!-- Central Accent (Modern Cricket Ball Icon) -->
+    <path android:pathData="M54,54m-12,0a12,12 0,1 1,24 0a12,12 0,1 1,-24 0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="42"
+                android:startY="42"
+                android:endX="66"
+                android:endY="66"
+                android:type="linear">
+                <item android:color="#FF00CC" android:offset="0" />
+                <item android:color="#333399" android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
 
-        <!-- Letter T (Sporty Block Italic) -->
-        <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M78,40 L52,40 L50,48 L60,48 L55,68 L63,68 L68,48 L76,48 Z" />
-
-    </group>
+    <!-- Cricket Ball Seam -->
+    <path
+        android:strokeWidth="1"
+        android:strokeColor="#FFFFFF"
+        android:pathData="M44,54 L64,54 M54,44 L54,64" />
 
 </vector>
