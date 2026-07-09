@@ -335,7 +335,7 @@ fun AdvancedLoadingScreen(isVisible: Boolean) {
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "Loading your experience...",
+                    text = "Loading...",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
