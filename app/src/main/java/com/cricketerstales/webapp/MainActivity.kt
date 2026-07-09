@@ -552,7 +552,7 @@ fun CricketersTalesWebView(
 
     // Update Status Bar Style based on Splash Visibility
     LaunchedEffect(showSplashScreen) {
-        val activity = context as? Activity ?: return@LaunchedEffect
+        val activity = context as? ComponentActivity ?: return@LaunchedEffect
         val window = activity.window
         val insetsController = WindowInsetsControllerCompat(window, window.decorView)
         
