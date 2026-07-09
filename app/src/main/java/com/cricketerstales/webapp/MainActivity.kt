@@ -562,6 +562,7 @@ fun CricketersTalesWebView(
                 statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
             )
             insetsController.isAppearanceLightStatusBars = false
+            insetsController.isAppearanceLightNavigationBars = false
         } else {
             // Site has white background, use dark icons
             activity.enableEdgeToEdge(
@@ -571,6 +572,7 @@ fun CricketersTalesWebView(
                 )
             )
             insetsController.isAppearanceLightStatusBars = true
+            insetsController.isAppearanceLightNavigationBars = true
         }
     }
 
