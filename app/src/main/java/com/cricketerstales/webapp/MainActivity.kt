@@ -756,6 +756,7 @@ fun CricketersTalesWebView(
                 swipeRefreshLayout.apply {
                     addView(webView)
                     setOnRefreshListener {
+                        isRefreshing = true
                         webView.reload()
                     }
                     viewTreeObserver.addOnScrollChangedListener {
