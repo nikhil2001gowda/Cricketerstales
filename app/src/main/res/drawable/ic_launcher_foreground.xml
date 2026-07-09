@@ -4,22 +4,28 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Exact Branded Red Circle (#FF0000) -->
+    <!-- Bold Branded Red Circle (#FF0000) -->
     <path
         android:fillColor="#FF0000"
-        android:pathData="M54,54m-44,0a44,44 0,1 1,88 0a44,44 0,1 1,-88 0" />
+        android:pathData="M54,54m-45,0a45,45 0,1 1,90 0a45,45 0,1 1,-90 0" />
 
-    <!-- Enhanced White "CT" Typography
-         Precisely matching the provided image's bold, italicized, and rounded style -->
+    <!-- Enhanced High-Definition "Sporty CT" Typography
+         Bold, Italicized, and Slanted for a professional sports feel -->
 
-    <!-- Letter C -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M48.7,40.5 C46.2,38.8 42.1,38.2 38.5,39.8 C32.5,42.5 28.5,52.5 29.8,61.2 C31.2,70.5 39.5,72.4 44.5,70.5 C47.2,69.5 49.5,67.2 49.8,64.2 L43.5,64.2 C43.2,65.5 41.5,66.8 39.5,66.8 C36.5,66.8 34.5,62.8 34.2,58.5 L50.2,58.5 C50.5,50.5 51.5,42.5 48.7,40.5 M34.8,53.2 C35.2,48.2 37.5,44.2 40.5,44.2 C42.8,44.2 44.5,45.8 44.8,48.5 L34.8,53.2 Z" />
+    <group
+        android:translateX="1"
+        android:translateY="2">
 
-    <!-- Letter T -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M70.5,42.2 L52.5,42.2 L53.5,47.2 L58.5,47.2 L55.5,68.5 L61.5,68.5 L64.5,47.2 L69.5,47.2 Z" />
+        <!-- Letter C (Sporty Block Italic) -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M48,40 L34,40 L28,68 L46,68 L47,60 L35,60 L37,48 L46,48 Z" />
+
+        <!-- Letter T (Sporty Block Italic) -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M78,40 L52,40 L50,48 L60,48 L55,68 L63,68 L68,48 L76,48 Z" />
+
+    </group>
 
 </vector>
