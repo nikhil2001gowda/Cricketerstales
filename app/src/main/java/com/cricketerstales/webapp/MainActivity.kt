@@ -84,7 +84,6 @@ class MainActivity : ComponentActivity() {
     private var downloadId: Long = -1L
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Immediate launch, no delay
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         
@@ -455,29 +454,30 @@ fun ModernBrandedLoader(isVisible: Boolean, isTransition: Boolean = false) {
                     .then(if (isTransition) Modifier.padding(top = 16.dp) else Modifier),
                 contentAlignment = Alignment.Center
             ) {
-                // Rotating Ring
+                // High-End Rotating Gradient Ring
                 Box(
                     modifier = Modifier
-                        .size(if (isTransition) 45.dp else 120.dp)
+                        .size(if (isTransition) 50.dp else 120.dp)
                         .rotate(rotation)
                         .background(
                             brush = Brush.sweepGradient(
                                 colors = listOf(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                                    MaterialTheme.colorScheme.primary,
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                    Color(0xFFFF4B2B).copy(alpha = 0.1f),
+                                    Color(0xFFD4145A),
+                                    Color(0xFF8E2DE2),
+                                    Color(0xFFFF4B2B).copy(alpha = 0.1f)
                                 )
                             ),
                             shape = CircleShape
                         )
                         .padding(if (isTransition) 2.dp else 4.dp)
                         .background(
-                            if (isTransition) Color.White.copy(alpha = 0.8f) else MaterialTheme.colorScheme.background,
+                            if (isTransition) Color.White.copy(alpha = 0.9f) else MaterialTheme.colorScheme.background,
                             shape = CircleShape
                         )
                 )
                 
-                // Pulsing Branded Core
+                // Enhanced Branded Core with Vector Logo
                 Box(
                     modifier = Modifier
                         .size(if (isTransition) 28.dp else 75.dp)
@@ -576,21 +576,16 @@ fun CricketersTalesWebView(
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
                         
-                        // MAXIMUM PERFORMANCE TUNING
                         settings.apply {
                             javaScriptEnabled = true
                             domStorageEnabled = true
                             databaseEnabled = true
                             cacheMode = WebSettings.LOAD_DEFAULT 
-                            
-                            // Speed optimizations
                             loadWithOverviewMode = true
                             useWideViewPort = true
                             setSupportZoom(true)
                             builtInZoomControls = true
                             displayZoomControls = false
-                            
-                            // Advanced rendering tweaks
                             offscreenPreRaster = true
                             layoutAlgorithm = WebSettings.LayoutAlgorithm.TEXT_AUTOSIZING
                             mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
@@ -621,7 +616,6 @@ fun CricketersTalesWebView(
                                 isRefreshing = false
                             }
 
-                            // AUTO-HEALING: Refresh on Errors
                             override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                                 if (request?.isForMainFrame == true && errorCount < 2) {
                                     errorCount++
@@ -634,7 +628,6 @@ fun CricketersTalesWebView(
                             }
 
                             override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
-                                // Auto-retry on SSL transient errors
                                 if (errorCount < 1) {
                                     errorCount++
                                     handler?.cancel()
@@ -651,6 +644,7 @@ fun CricketersTalesWebView(
                                 val requestUrl = request?.url?.toString() ?: return false
                                 return if (requestUrl.contains("cricketerstales.com")) {
                                     false 
+                                    // Removed isNavigating trigger here to ensure instant responsiveness on click
                                 } else {
                                     try {
                                         val intent = Intent(Intent.ACTION_VIEW, requestUrl.toUri())
@@ -663,7 +657,6 @@ fun CricketersTalesWebView(
                         
                         webChromeClient = object : android.webkit.WebChromeClient() {
                             override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                                // Super aggressive hide for instant feel
                                 if (newProgress > 40) {
                                     showSplashScreen = false
                                     isNavigating = false
