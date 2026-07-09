@@ -8,8 +8,10 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.provider.Settings
 import android.view.ViewGroup
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
@@ -17,6 +19,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -30,53 +33,18 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.SystemUpdate
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -93,6 +61,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.cricketerstales.webapp.data.PreferenceManager
 import com.cricketerstales.webapp.ui.theme.CricketerstalesTheme
 import kotlinx.coroutines.Dispatchers
@@ -121,6 +90,7 @@ class MainActivity : ComponentActivity() {
                 
                 var showExitDialog by remember { mutableStateOf(false) }
                 var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
+                var showInstallDialog by remember { mutableStateOf(false) }
 
                 LaunchedEffect(Unit) {
                     val info = checkForUpdates(context)
@@ -134,20 +104,15 @@ class MainActivity : ComponentActivity() {
                         override fun onReceive(context: Context, intent: Intent) {
                             val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
                             if (id == downloadId) {
-                                scope.launch {
-                                    val result = snackbarHostState.showSnackbar(
-                                        message = "Download complete!",
-                                        actionLabel = "INSTALL",
-                                        duration = SnackbarDuration.Indefinite
-                                    )
-                                    if (result == SnackbarResult.ActionPerformed) {
-                                        installApk(context)
-                                    }
-                                }
+                                showInstallDialog = true
                             }
                         }
                     }
-                    context.registerReceiver(onDownloadComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), RECEIVER_EXPORTED)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        context.registerReceiver(onDownloadComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), RECEIVER_NOT_EXPORTED)
+                    } else {
+                        context.registerReceiver(onDownloadComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+                    }
                     onDispose { context.unregisterReceiver(onDownloadComplete) }
                 }
 
@@ -186,6 +151,16 @@ class MainActivity : ComponentActivity() {
                                     downloadId = downloadAndInstallApk(context, info.downloadUrl)
                                 },
                                 onDismiss = { updateInfo = null }
+                            )
+                        }
+
+                        if (showInstallDialog) {
+                            InstallReadyDialog(
+                                onInstall = {
+                                    showInstallDialog = false
+                                    checkInstallPermissionAndInstall(context)
+                                },
+                                onDismiss = { showInstallDialog = false }
                             )
                         }
                     }
@@ -237,6 +212,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun downloadAndInstallApk(context: Context, url: String): Long {
+        val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "update.apk")
+        if (file.exists()) file.delete()
+
         val request = DownloadManager.Request(Uri.parse(url))
             .setTitle("CricketersTales Update")
             .setDescription("Downloading new version...")
@@ -247,6 +225,20 @@ class MainActivity : ComponentActivity() {
 
         val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         return dm.enqueue(request)
+    }
+
+    private fun checkInstallPermissionAndInstall(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (!context.packageManager.canRequestPackageInstalls()) {
+                val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                    data = Uri.parse("package:${context.packageName}")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+                return
+            }
+        }
+        installApk(context)
     }
 
     private fun installApk(context: Context) {
@@ -270,6 +262,83 @@ class MainActivity : ComponentActivity() {
 data class UpdateInfo(val version: String, val downloadUrl: String)
 
 @Composable
+fun InstallReadyDialog(onInstall: () -> Unit, onDismiss: () -> Unit) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .padding(24.dp)
+                .fillMaxWidth()
+                .wrapContentHeight(),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Surface(
+                    modifier = Modifier.size(80.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.secondaryContainer
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.DownloadDone,
+                            contentDescription = null,
+                            modifier = Modifier.size(40.dp),
+                            tint = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Text(
+                    text = "Download Complete!",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = "The update has been downloaded successfully. Click install to update your app to the latest version.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel", color = MaterialTheme.colorScheme.secondary)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = onInstall,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Text("Install Now", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun CustomUpdateDialog(onUpdate: () -> Unit, onDismiss: () -> Unit) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -278,7 +347,8 @@ fun CustomUpdateDialog(onUpdate: () -> Unit, onDismiss: () -> Unit) {
         Surface(
             modifier = Modifier
                 .padding(24.dp)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .wrapContentHeight(),
             shape = RoundedCornerShape(28.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp
@@ -385,7 +455,7 @@ fun ModernLoader(isVisible: Boolean, isTransition: Boolean = false) {
                     .then(if (isTransition) Modifier.padding(top = 24.dp) else Modifier),
                 contentAlignment = Alignment.Center
             ) {
-                // High-End Rotating Gradient Ring
+                // Modern Rotating Gradient Ring
                 Box(
                     modifier = Modifier
                         .size(if (isTransition) 45.dp else 100.dp)
@@ -495,15 +565,15 @@ fun CricketersTalesWebView(
     modifier: Modifier = Modifier,
     onShowExitDialog: () -> Unit
 ) {
-    var webView: WebView? by remember { mutableStateOf(null) }
+    var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     var showSplashScreen by remember { mutableStateOf(true) }
     var isNavigating by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
     val pullToRefreshState = rememberPullToRefreshState()
 
     BackHandler(enabled = true) {
-        if (webView?.canGoBack() == true) {
-            webView?.goBack()
+        if (webViewInstance?.canGoBack() == true) {
+            webViewInstance?.goBack()
         } else {
             onShowExitDialog()
         }
@@ -515,13 +585,14 @@ fun CricketersTalesWebView(
             state = pullToRefreshState,
             onRefresh = {
                 isRefreshing = true
-                webView?.reload()
+                webViewInstance?.reload()
             },
             modifier = Modifier.fillMaxSize()
         ) {
             AndroidView(
                 factory = { context ->
-                    WebView(context).apply {
+                    val swipeRefreshLayout = SwipeRefreshLayout(context)
+                    val webView = WebView(context).apply {
                         layoutParams = ViewGroup.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
@@ -542,7 +613,7 @@ fun CricketersTalesWebView(
                         webViewClient = object : WebViewClient() {
                             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                                 super.onPageStarted(view, url, favicon)
-                                if (!showSplashScreen && !isRefreshing) {
+                                if (!showSplashScreen && !swipeRefreshLayout.isRefreshing) {
                                     isNavigating = true
                                 }
                             }
@@ -551,6 +622,7 @@ fun CricketersTalesWebView(
                                 super.onPageFinished(view, url)
                                 isNavigating = false
                                 showSplashScreen = false
+                                swipeRefreshLayout.isRefreshing = false
                                 isRefreshing = false
                             }
 
@@ -558,6 +630,7 @@ fun CricketersTalesWebView(
                                 super.onPageCommitVisible(view, view?.url)
                                 showSplashScreen = false
                                 isNavigating = false
+                                swipeRefreshLayout.isRefreshing = false
                                 isRefreshing = false
                             }
 
@@ -580,26 +653,33 @@ fun CricketersTalesWebView(
                         
                         webChromeClient = object : android.webkit.WebChromeClient() {
                             override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                                if (newProgress > 45) { // Early exit for speed
+                                if (newProgress > 45) {
                                     showSplashScreen = false
                                     isNavigating = false
+                                    swipeRefreshLayout.isRefreshing = false
                                     isRefreshing = false
                                 }
                             }
                         }
 
                         loadUrl(url)
-                        webView = this
+                        webViewInstance = this
                     }
+
+                    swipeRefreshLayout.apply {
+                        addView(webView)
+                        isEnabled = false // Disable native swipe, we use PullToRefreshBox
+                    }
+                    swipeRefreshLayout
                 },
                 modifier = Modifier.fillMaxSize()
             )
         }
 
-        // Modern Initial Splash (No text, no blur)
+        // Modern Initial Splash
         ModernLoader(isVisible = showSplashScreen)
         
         // Branded Top-Center Transition Loader
-        ModernLoader(isVisible = isNavigating && !isRefreshing, isTransition = true)
+        ModernLoader(isVisible = isNavigating, isTransition = true)
     }
 }
