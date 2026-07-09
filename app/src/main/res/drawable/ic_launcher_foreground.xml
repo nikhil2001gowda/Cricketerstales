@@ -21,14 +21,14 @@
         </aapt:attr>
     </path>
 
-    <!-- Rescaled Interlocking CT (Reduced size to fit better in circles) -->
+    <!-- Rescaled Interlocking CT (Perfectly Centered) -->
     <group
         android:pivotX="54"
         android:pivotY="54"
-        android:scaleX="0.85"
-        android:scaleY="0.85"
-        android:translateX="0"
-        android:translateY="0">
+        android:scaleX="0.80"
+        android:scaleY="0.80"
+        android:translateX="2"
+        android:translateY="2">
 
         <path
             android:fillColor="#FFFFFF"

@@ -51,6 +51,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
@@ -484,15 +485,16 @@ fun ModernBrandedLoader(isVisible: Boolean, isTransition: Boolean = false) {
                     modifier = Modifier
                         .size(if (isTransition) 28.dp else 75.dp)
                         .scale(pulse)
-                        .background(Color.White, shape = CircleShape)
-                        .padding(2.dp),
+                        .clip(CircleShape) // Enforce circular shape in loaders
+                        .background(Color.White)
+                        .padding(1.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.ic_launcher_foreground),
                         contentDescription = "Logo",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit
+                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                        contentScale = ContentScale.FillBounds
                     )
                 }
             }
