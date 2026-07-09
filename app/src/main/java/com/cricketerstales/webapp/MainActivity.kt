@@ -1,6 +1,7 @@
 package com.cricketerstales.webapp
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Bundle
@@ -10,8 +11,10 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,9 +26,14 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -41,6 +49,12 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.net.toUri
 import com.cricketerstales.webapp.data.PreferenceManager
 import com.cricketerstales.webapp.ui.theme.CricketerstalesTheme
+import com.google.android.play.core.appupdate.AppUpdateManagerFactory
+import com.google.android.play.core.appupdate.AppUpdateOptions
+import com.google.android.play.core.install.InstallStateUpdatedListener
+import com.google.android.play.core.install.model.AppUpdateType
+import com.google.android.play.core.install.model.InstallStatus
+import com.google.android.play.core.install.model.UpdateAvailability
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -53,12 +67,54 @@ class MainActivity : ComponentActivity() {
                 val preferenceManager = remember { PreferenceManager(context) }
                 val isTermsAccepted by preferenceManager.isTermsAccepted.collectAsState(initial = null)
                 val scope = rememberCoroutineScope()
+                val snackbarHostState = remember { SnackbarHostState() }
                 
                 var showExitDialog by remember { mutableStateOf(false) }
 
+                // In-App Update Logic
+                val appUpdateManager = remember { AppUpdateManagerFactory.create(context) }
+                val updateLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.StartIntentSenderForResult()
+                ) { result ->
+                    if (result.resultCode != Activity.RESULT_OK) {
+                        // If the update is canceled or fails, you can request to start the update again.
+                    }
+                }
+
+                LaunchedEffect(Unit) {
+                    val appUpdateInfoTask = appUpdateManager.appUpdateInfo
+                    appUpdateInfoTask.addOnSuccessListener { appUpdateInfo ->
+                        if (appUpdateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
+                            && appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)
+                        ) {
+                            appUpdateManager.startUpdateFlowForResult(
+                                appUpdateInfo,
+                                updateLauncher,
+                                AppUpdateOptions.newBuilder(AppUpdateType.FLEXIBLE).build()
+                            )
+                        }
+                    }
+
+                    val listener = InstallStateUpdatedListener { state ->
+                        if (state.installStatus() == InstallStatus.DOWNLOADED) {
+                            scope.launch {
+                                val result = snackbarHostState.showSnackbar(
+                                    message = "An update has just been downloaded.",
+                                    actionLabel = "RESTART",
+                                    duration = SnackbarDuration.Indefinite
+                                )
+                                if (result == SnackbarResult.ActionPerformed) {
+                                    appUpdateManager.completeUpdate()
+                                }
+                            }
+                        }
+                    }
+                    appUpdateManager.registerListener(listener)
+                }
+
                 when (isTermsAccepted) {
                     null -> {
-                        // Loading preferences, show nothing or a splash
+                        // Loading preferences
                     }
                     false -> {
                         TermsAndConditionsDialog(
@@ -73,7 +129,10 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     true -> {
-                        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                        Scaffold(
+                            modifier = Modifier.fillMaxSize(),
+                            snackbarHost = { SnackbarHost(snackbarHostState) }
+                        ) { innerPadding ->
                             CricketersTalesWebView(
                                 url = "https://cricketerstales.com/",
                                 modifier = Modifier.padding(innerPadding),
