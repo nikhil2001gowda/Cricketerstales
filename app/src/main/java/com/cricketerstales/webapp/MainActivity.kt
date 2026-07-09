@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -43,8 +44,6 @@ import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -68,14 +67,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -83,7 +79,6 @@ import androidx.core.net.toUri
 import com.cricketerstales.webapp.data.PreferenceManager
 import com.cricketerstales.webapp.ui.theme.CricketerstalesTheme
 import com.google.android.play.core.appupdate.AppUpdateInfo
-import com.google.android.play.core.appupdate.AppUpdateManager
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory
 import com.google.android.play.core.appupdate.AppUpdateOptions
 import com.google.android.play.core.install.InstallStateUpdatedListener
@@ -95,7 +90,10 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Enabling Edge-to-Edge to allow content to flow behind system bars
         enableEdgeToEdge()
+        
         setContent {
             CricketerstalesTheme {
                 val context = LocalContext.current
@@ -123,7 +121,6 @@ class MainActivity : ComponentActivity() {
                         if (appUpdateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
                             && appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)
                         ) {
-                            // Show custom cool update dialog instead of immediate flow
                             showUpdateDialog = appUpdateInfo
                         }
                     }
@@ -162,11 +159,14 @@ class MainActivity : ComponentActivity() {
                     true -> {
                         Scaffold(
                             modifier = Modifier.fillMaxSize(),
-                            snackbarHost = { SnackbarHost(snackbarHostState) }
-                        ) { innerPadding ->
+                            snackbarHost = { SnackbarHost(snackbarHostState) },
+                            // Remove all default insets from Scaffold to allow true full-screen
+                            contentWindowInsets = WindowInsets(0, 0, 0, 0)
+                        ) { _ ->
+                            // Ignore the innerPadding to allow WebView to occupy the entire screen
                             CricketersTalesWebView(
                                 url = "https://cricketerstales.com/",
-                                modifier = Modifier.padding(innerPadding),
+                                modifier = Modifier.fillMaxSize(),
                                 onShowExitDialog = { showExitDialog = true }
                             )
                         }
@@ -207,8 +207,7 @@ fun CustomUpdateDialog(onUpdate: () -> Unit, onDismiss: () -> Unit) {
         Surface(
             modifier = Modifier
                 .padding(24.dp)
-                .fillMaxWidth()
-                .wrapContentHeight(),
+                .fillMaxWidth(),
             shape = RoundedCornerShape(28.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp
@@ -217,7 +216,6 @@ fun CustomUpdateDialog(onUpdate: () -> Unit, onDismiss: () -> Unit) {
                 modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Cool Icon with Circle
                 Surface(
                     modifier = Modifier.size(80.dp),
                     shape = CircleShape,
@@ -275,9 +273,6 @@ fun CustomUpdateDialog(onUpdate: () -> Unit, onDismiss: () -> Unit) {
         }
     }
 }
-
-// Extension to help with wrapContentHeight since it's not directly in Modifier
-fun Modifier.wrapContentHeight() = this.then(Modifier.height(androidx.compose.ui.unit.Dp.Unspecified))
 
 @Composable
 fun AdvancedLoadingScreen(isVisible: Boolean) {
@@ -424,7 +419,7 @@ fun CricketersTalesWebView(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier) {
         AndroidView(
             factory = { context ->
                 WebView(context).apply {
@@ -486,7 +481,9 @@ fun CricketersTalesWebView(
         if (isLoading && !showSplashScreen) {
             LinearProgressIndicator(
                 progress = { progress },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 32.dp) // Provide some spacing for the status bar area
             )
         }
 
